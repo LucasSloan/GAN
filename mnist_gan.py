@@ -1,32 +1,72 @@
 """Basic GAN to generate mnist images."""
 import tensorflow as tf
 import numpy as np
+import imageio
 
 from tensorflow.examples.tutorials.mnist import input_data
 mnist = input_data.read_data_sets("../tensorflow_learning/MNIST/MNIST_data/", one_hot=True)
 
+#The below functions are taken from carpdem20's implementation https://github.com/carpedm20/DCGAN-tensorflow
+#They allow for saving sample images from the generator to follow progress
+def save_images(images, size, image_path):
+    return imsave(inverse_transform(images), size, image_path)
+
+def imsave(images, size, path):
+    return imageio.imwrite(path, merge(images, size))
+
+def inverse_transform(images):
+    return (images+1.)/2.
+
+def merge(images, size):
+    h, w = images.shape[1], images.shape[2]
+    img = np.zeros((h * size[0], w * size[1]))
+
+    for idx, image in enumerate(images):
+        i = idx % size[1]
+        j = idx // size[1]
+        img[j*h:j*h+h, i*w:i*w+w] = image
+
+    return img
+
+
+initializer = tf.truncated_normal_initializer(stddev=0.02)
+
 
 def generator(z):
-    W1 = tf.get_variable('W1', [25, 784], initializer=tf.random_normal_initializer())
-    b1 = tf.get_variable('b1', [784], initializer=tf.constant_initializer(0.0))
+    W1 = tf.get_variable('W1', [25, 7000], initializer=initializer)
+    b1 = tf.get_variable('b1', [7000], initializer=tf.constant_initializer(0.0))
     
-    mid = tf.nn.relu(tf.matmul(z, W1) + b1)
+    f1 = tf.nn.sigmoid(tf.matmul(z, W1) + b1)
 
-    W2 = tf.get_variable('W2', [784, 784], initializer=tf.random_normal_initializer())
-    b2 = tf.get_variable('b2', [784], initializer=tf.constant_initializer(0.0))
+    W2 = tf.get_variable('W2', [7000, 7000], initializer=initializer)
+    b2 = tf.get_variable('b2', [7000], initializer=tf.constant_initializer(0.0))
 
-    return tf.nn.relu(tf.matmul(mid, W2) + b2)
+    f2 = tf.nn.relu(tf.matmul(f1, W2) + b2)
+
+    W3 = tf.get_variable('W3', [7000, 784], initializer=initializer)
+    b3 = tf.get_variable('b3', [784], initializer=tf.constant_initializer(0.0))
+
+    f3 = tf.nn.tanh(tf.matmul(f2, W3) + b3)
+
+    return f3
 
 def discriminator(x):
-    W1 = tf.get_variable('W1', [784, 25], initializer=tf.random_normal_initializer())
-    b1 = tf.get_variable('b1', [25], initializer=tf.constant_initializer(0.0))
+    W1 = tf.get_variable('W1', [784, 7000], initializer=initializer)
+    b1 = tf.get_variable('b1', [7000], initializer=tf.constant_initializer(0.0))
     
-    mid = tf.nn.relu(tf.matmul(x, W1) + b1)
+    f1 = tf.nn.sigmoid(tf.matmul(x, W1) + b1)
 
-    W2 = tf.get_variable('W2', [25, 1], initializer=tf.random_normal_initializer())
-    b2 = tf.get_variable('b2', [1], initializer=tf.constant_initializer(0.0))
+    # W2 = tf.get_variable('W2', [7000, 7000], initializer=initializer)
+    # b2 = tf.get_variable('b2', [7000], initializer=tf.constant_initializer(0.0))
 
-    return tf.sigmoid(tf.matmul(mid, W2) + b2)
+    # f2 = tf.nn.relu(tf.matmul(f1, W2) + b2)
+
+    W3 = tf.get_variable('W3', [7000, 1], initializer=initializer)
+    b3 = tf.get_variable('b3', [1], initializer=tf.constant_initializer(0.0))
+
+    f3 = tf.nn.sigmoid(tf.matmul(f1, W3) + b3)
+
+    return f3
 
 with tf.variable_scope('G'):
     z = tf.placeholder(tf.float32, [100, 25])
@@ -34,9 +74,9 @@ with tf.variable_scope('G'):
 
 x = tf.placeholder(tf.float32, [None, 784])
 with tf.variable_scope('D'):
-    D1 = discriminator(x)
+    Dx = discriminator(x)
 with tf.variable_scope('D', reuse=True):
-    D2 = discriminator(G)
+    Dg = discriminator(G)
 
 def log(x):
     """
@@ -48,29 +88,47 @@ def log(x):
     return tf.log(tf.maximum(x, 1e-5))
 
 
-loss_d = tf.reduce_mean(-log(D1) - log(1 - D2))
-loss_g = tf.reduce_mean(-log(D2))
+loss_d = -tf.reduce_mean(tf.log(Dx) + tf.log(1.-Dg)) #This optimizes the discriminator.
+loss_g = -tf.reduce_mean(tf.log(Dg)) #This optimizes the generator.
+
 
 vars = tf.trainable_variables()
+for v in vars:
+    print(v.name)
 d_params = [v for v in vars if v.name.startswith('D/')]
 g_params = [v for v in vars if v.name.startswith('G/')]
 
-d_opt = tf.train.AdamOptimizer(1e4).minimize(loss_d, var_list=d_params)
-g_opt = tf.train.AdamOptimizer(1e4).minimize(loss_g, var_list=g_params)
+d_opt = tf.train.AdamOptimizer(1e-4).minimize(loss_d, var_list=d_params)
+g_opt = tf.train.AdamOptimizer(1e-4).minimize(loss_g, var_list=g_params)
 
 with tf.Session() as session:
     tf.local_variables_initializer().run()
     tf.global_variables_initializer().run()
 
-    for step in range(100):
+    for step in range(10000):
         # update discriminator
         mnist_images, _ = mnist.train.next_batch(100)
+        mnist_images = (mnist_images - 0.5) * 2.0
+        # print(mnist_images[0])
         input_noise = np.random.rand(100, 25)
-        loss_d_thingy, _ = session.run([loss_d, d_opt], {x: mnist_images, z: input_noise})
+        # print(input_noise)
+        loss_d_thingy, _, dx, dg = session.run([loss_d, d_opt, Dx, Dg], {x: mnist_images, z: input_noise})
 
+        # print("Dx!!!!!!!!")
+        # print(dx[:9])
+        # print("Dg!!!!!!!!")
+        # print(dg[:9])
         # update generator
         input_noise = np.random.rand(100, 25)
         loss_g_thingy, _ = session.run([loss_g, g_opt], {z: input_noise})
+        input_noise = np.random.rand(100, 25)
+        loss_g_thingy, _ = session.run([loss_g, g_opt], {z: input_noise})
 
-        if step % 1 == 0:
-            print('{}: {:.4f}\t{:.4f}'.format(step, loss_d_thingy, loss_g_thingy))
+        if step % 100 == 0:
+            print('{}: discriminator loss {:.8f}\tgenerator loss {:.8f}'.format(step, loss_d_thingy, loss_g_thingy))
+
+        if step % 100 == 0:
+            input_noise = np.random.rand(100, 25)
+            image = session.run(G, {z: input_noise})
+            # print(image[0])
+            save_images(np.reshape(image, [100, 28, 28]), [10, 10], 'generated_images/fig{}.png'.format(step))
