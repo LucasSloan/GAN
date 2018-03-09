@@ -6,6 +6,13 @@ import imageio
 from tensorflow.examples.tutorials.mnist import input_data
 mnist = input_data.read_data_sets("../tensorflow_learning/MNIST/MNIST_data/", one_hot=True)
 
+#This function performns a leaky relu activation, which is needed for the discriminator network.
+def lrelu(x, leak=0.2, name="lrelu"):
+     with tf.variable_scope(name):
+         f1 = 0.5 * (1 + leak)
+         f2 = 0.5 * (1 - leak)
+         return f1 * x + f2 * abs(x)
+
 #The below functions are taken from carpdem20's implementation https://github.com/carpedm20/DCGAN-tensorflow
 #They allow for saving sample images from the generator to follow progress
 def save_images(images, size, image_path):
@@ -33,38 +40,50 @@ initializer = tf.truncated_normal_initializer(stddev=0.02)
 
 
 def generator(z):
-    W1 = tf.get_variable('W1', [25, 7000], initializer=initializer)
-    b1 = tf.get_variable('b1', [7000], initializer=tf.constant_initializer(0.0))
+    W1 = tf.get_variable('W1', [25, 7840], initializer=initializer)
+    b1 = tf.get_variable('b1', [7840], initializer=tf.constant_initializer(0.0))
     
     f1 = tf.nn.sigmoid(tf.matmul(z, W1) + b1)
+    f1 = tf.reshape(f1, [-1, 28, 28, 10])
 
-    W2 = tf.get_variable('W2', [7000, 7000], initializer=initializer)
-    b2 = tf.get_variable('b2', [7000], initializer=tf.constant_initializer(0.0))
+    # W2 = tf.get_variable('W2', [3500, 3500], initializer=initializer)
+    # b2 = tf.get_variable('b2', [3500], initializer=tf.constant_initializer(0.0))
 
-    f2 = tf.nn.relu(tf.matmul(f1, W2) + b2)
+    # f2 = tf.nn.sigmoid(tf.matmul(f1, W2) + b2)
 
-    W3 = tf.get_variable('W3', [7000, 784], initializer=initializer)
-    b3 = tf.get_variable('b3', [784], initializer=tf.constant_initializer(0.0))
+    # W3 = tf.get_variable('W3', [3500, 784], initializer=initializer)
+    # b3 = tf.get_variable('b3', [784], initializer=tf.constant_initializer(0.0))
 
-    f3 = tf.nn.tanh(tf.matmul(f2, W3) + b3)
+    # f3 = tf.nn.tanh(tf.matmul(f2, W3) + b3)
 
-    return f3
+    W_conv1 = tf.get_variable('W2', [5, 5, 1, 10], initializer=initializer)
+    b_conv1 = tf.get_variable('b2', [28, 28, 1], initializer=tf.constant_initializer(0.0))
+
+    conv1 = tf.nn.tanh(tf.nn.conv2d_transpose(f1, W_conv1, [100, 28, 28, 1], [1, 1, 1, 1]) + b_conv1)
+
+    # W_conv2 = tf.get_variable('W3', [5, 5, 1, 32], initializer=initializer)
+    # b_conv2 = tf.get_variable('b3', [28, 28, 1], initializer=tf.constant_initializer(0.0))
+
+    # conv2 = tf.nn.tanh(tf.nn.conv2d_transpose(conv1, W_conv2, [100, 28, 28, 1], [1, 1, 1, 1]) + b_conv2)
+    conv1 = tf.reshape(conv1, [-1, 784])
+
+    return conv1
 
 def discriminator(x):
-    W1 = tf.get_variable('W1', [784, 7000], initializer=initializer)
-    b1 = tf.get_variable('b1', [7000], initializer=tf.constant_initializer(0.0))
+    W1 = tf.get_variable('W1', [784, 3500], initializer=initializer)
+    b1 = tf.get_variable('b1', [3500], initializer=tf.constant_initializer(0.0))
     
-    f1 = tf.nn.sigmoid(tf.matmul(x, W1) + b1)
+    f1 = lrelu(tf.matmul(x, W1) + b1)
 
-    # W2 = tf.get_variable('W2', [7000, 7000], initializer=initializer)
-    # b2 = tf.get_variable('b2', [7000], initializer=tf.constant_initializer(0.0))
+    W2 = tf.get_variable('W2', [3500, 3500], initializer=initializer)
+    b2 = tf.get_variable('b2', [3500], initializer=tf.constant_initializer(0.0))
 
-    # f2 = tf.nn.relu(tf.matmul(f1, W2) + b2)
+    f2 = lrelu(tf.matmul(f1, W2) + b2)
 
-    W3 = tf.get_variable('W3', [7000, 1], initializer=initializer)
+    W3 = tf.get_variable('W3', [3500, 1], initializer=initializer)
     b3 = tf.get_variable('b3', [1], initializer=tf.constant_initializer(0.0))
 
-    f3 = tf.nn.sigmoid(tf.matmul(f1, W3) + b3)
+    f3 = tf.nn.sigmoid(tf.matmul(f2, W3) + b3)
 
     return f3
 
@@ -119,10 +138,9 @@ with tf.Session() as session:
         # print("Dg!!!!!!!!")
         # print(dg[:9])
         # update generator
-        input_noise = np.random.rand(100, 25)
-        loss_g_thingy, _ = session.run([loss_g, g_opt], {z: input_noise})
-        input_noise = np.random.rand(100, 25)
-        loss_g_thingy, _ = session.run([loss_g, g_opt], {z: input_noise})
+        for i in range(7):
+            input_noise = np.random.rand(100, 25)
+            loss_g_thingy, _ = session.run([loss_g, g_opt], {z: input_noise})
 
         if step % 100 == 0:
             print('{}: discriminator loss {:.8f}\tgenerator loss {:.8f}'.format(step, loss_d_thingy, loss_g_thingy))
