@@ -60,7 +60,6 @@ def generator(z):
     b_conv2 = tf.get_variable('b_conv2', [28, 28, 1], initializer=tf.constant_initializer(0.0))
 
     conv2 = tf.nn.tanh(tf.nn.conv2d_transpose(conv1, W_conv2, [100, 28, 28, 1], [1, 2, 2, 1]) + b_conv2)
-    conv2 = tf.reshape(conv2, [-1, 784])
 
     return conv2
 
@@ -77,12 +76,10 @@ def minibatch_layer(input, num_kernels=5, kernel_dim=3):
     return tf.concat([input, minibatch_features], 1)
 
 def discriminator(x):
-    x_image = tf.reshape(x, [-1, 28, 28, 1])
-
     W_conv1 = tf.get_variable('W_conv1', [5, 5, 1, 32], initializer=initializer)
     b_conv1 = tf.get_variable('b_conv1', [32], initializer=tf.constant_initializer(0.0))
 
-    h_conv1 = lrelu(tf.nn.conv2d(x_image, W_conv1, strides=[1, 1, 1, 1], padding='SAME') + b_conv1)
+    h_conv1 = lrelu(tf.nn.conv2d(x, W_conv1, strides=[1, 1, 1, 1], padding='SAME') + b_conv1)
     h_pool1 = tf.nn.max_pool(h_conv1, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
 
     W_conv2 = tf.get_variable('W_conv2', [5, 5, 32, 64], initializer=initializer)
@@ -94,8 +91,6 @@ def discriminator(x):
     h_pool2_flat = tf.reshape(h_pool2, [-1, 7*7*64])
 
     minibatch = minibatch_layer(h_pool2_flat, 5, 3)
-
-    print(minibatch.get_shape())
 
     W1 = tf.get_variable('W1', [7*7*64 + 5, 1024], initializer=initializer)
     b1 = tf.get_variable('b1', [1024], initializer=tf.constant_initializer(0.0))
@@ -113,7 +108,7 @@ with tf.variable_scope('G'):
     z = tf.placeholder(tf.float32, [100, 25])
     G = generator(z)
 
-x = tf.placeholder(tf.float32, [None, 784])
+x = tf.placeholder(tf.float32, [None, 28, 28, 1])
 with tf.variable_scope('D'):
     Dx = discriminator(x)
 with tf.variable_scope('D', reuse=True):
@@ -149,7 +144,7 @@ with tf.Session() as session:
     for step in range(10000):
         # update discriminator
         mnist_images, _ = mnist.train.next_batch(100)
-        mnist_images = (mnist_images - 0.5) * 2.0
+        mnist_images = (np.reshape(mnist_images, [100, 28, 28, 1]) - 0.5) * 2.0
         input_noise = np.random.rand(100, 25)
         loss_d_thingy, _, dx, dg = session.run([loss_d, d_opt, Dx, Dg], {x: mnist_images, z: input_noise})
 
