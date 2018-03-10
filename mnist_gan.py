@@ -69,6 +69,18 @@ def generator(z):
 
     return conv2
 
+def minibatch_layer(input, num_kernels=5, kernel_dim=3):
+    mb_fc_W = tf.get_variable('mb_fc_W', [input.get_shape()[1], num_kernels * kernel_dim], initializer=initializer)
+    mb_fc_b = tf.get_variable('mb_fc_b', [num_kernels * kernel_dim], initializer=tf.constant_initializer(0.0))
+
+    mb_fc = tf.matmul(input, mb_fc_W) + mb_fc_b
+
+    activation = tf.reshape(mb_fc, [-1, num_kernels, kernel_dim])
+    diffs = tf.expand_dims(activation, 3) - tf.expand_dims(tf.transpose(activation, [1, 2, 0]), 0)
+    abs_diffs = tf.reduce_sum(tf.abs(diffs), 2)
+    minibatch_features = tf.reduce_sum(tf.exp(-abs_diffs), 2)
+    return tf.concat([input, minibatch_features], 1)
+
 def discriminator(x):
     x_image = tf.reshape(x, [-1, 28, 28, 1])
 
@@ -86,10 +98,14 @@ def discriminator(x):
 
     h_pool2_flat = tf.reshape(h_pool2, [-1, 7*7*64])
 
-    W1 = tf.get_variable('W1', [7*7*64, 1024], initializer=initializer)
+    minibatch = minibatch_layer(h_pool2_flat, 5, 3)
+
+    print(minibatch.get_shape())
+
+    W1 = tf.get_variable('W1', [7*7*64 + 5, 1024], initializer=initializer)
     b1 = tf.get_variable('b1', [1024], initializer=tf.constant_initializer(0.0))
     
-    f1 = lrelu(tf.matmul(h_pool2_flat, W1) + b1)
+    f1 = lrelu(tf.matmul(minibatch, W1) + b1)
 
     W2 = tf.get_variable('W2', [1024, 1], initializer=initializer)
     b2 = tf.get_variable('b2', [1], initializer=tf.constant_initializer(0.0))
@@ -156,7 +172,7 @@ with tf.Session() as session:
         # print("Dg!!!!!!!!")
         # print(dg[:9])
         # update generator
-        for i in range(5):
+        for i in range(10):
             input_noise = np.random.rand(100, 25)
             loss_g_thingy, _ = session.run([loss_g, g_opt], {z: input_noise})
 
