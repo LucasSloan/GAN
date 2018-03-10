@@ -40,52 +40,70 @@ initializer = tf.truncated_normal_initializer(stddev=0.02)
 
 
 def generator(z):
-    W1 = tf.get_variable('W1', [25, 7840], initializer=initializer)
-    b1 = tf.get_variable('b1', [7840], initializer=tf.constant_initializer(0.0))
+    fcW1 = tf.get_variable('fcW1', [25, 1024], initializer=initializer)
+    fcb1 = tf.get_variable('fcb1', [1024], initializer=tf.constant_initializer(0.0))
     
-    f1 = tf.nn.sigmoid(tf.matmul(z, W1) + b1)
-    f1 = tf.reshape(f1, [-1, 28, 28, 10])
+    f1 = tf.nn.sigmoid(tf.matmul(z, fcW1) + fcb1)
 
-    # W2 = tf.get_variable('W2', [3500, 3500], initializer=initializer)
-    # b2 = tf.get_variable('b2', [3500], initializer=tf.constant_initializer(0.0))
+    W2 = tf.get_variable('W2', [1024, 28 * 28 * 64], initializer=initializer)
+    b2 = tf.get_variable('b2', [28 * 28 * 64], initializer=tf.constant_initializer(0.0))
 
-    # f2 = tf.nn.sigmoid(tf.matmul(f1, W2) + b2)
+    f2 = tf.nn.sigmoid(tf.matmul(f1, W2) + b2)
+    f2 = tf.reshape(f2, [-1, 28, 28, 64])
 
     # W3 = tf.get_variable('W3', [3500, 784], initializer=initializer)
     # b3 = tf.get_variable('b3', [784], initializer=tf.constant_initializer(0.0))
 
     # f3 = tf.nn.tanh(tf.matmul(f2, W3) + b3)
 
-    W_conv1 = tf.get_variable('W2', [5, 5, 1, 10], initializer=initializer)
-    b_conv1 = tf.get_variable('b2', [28, 28, 1], initializer=tf.constant_initializer(0.0))
+    W_conv1 = tf.get_variable('W_conv1', [5, 5, 32, 64], initializer=initializer)
+    b_conv1 = tf.get_variable('b_conv1', [28, 28, 32], initializer=tf.constant_initializer(0.0))
 
-    conv1 = tf.nn.tanh(tf.nn.conv2d_transpose(f1, W_conv1, [100, 28, 28, 1], [1, 1, 1, 1]) + b_conv1)
+    conv1 = tf.nn.sigmoid(tf.nn.conv2d_transpose(f2, W_conv1, [100, 28, 28, 32], [1, 1, 1, 1]) + b_conv1)
 
-    # W_conv2 = tf.get_variable('W3', [5, 5, 1, 32], initializer=initializer)
-    # b_conv2 = tf.get_variable('b3', [28, 28, 1], initializer=tf.constant_initializer(0.0))
+    W_conv2 = tf.get_variable('W_conv2', [5, 5, 1, 32], initializer=initializer)
+    b_conv2 = tf.get_variable('b_conv2', [28, 28, 1], initializer=tf.constant_initializer(0.0))
 
-    # conv2 = tf.nn.tanh(tf.nn.conv2d_transpose(conv1, W_conv2, [100, 28, 28, 1], [1, 1, 1, 1]) + b_conv2)
-    conv1 = tf.reshape(conv1, [-1, 784])
+    conv2 = tf.nn.tanh(tf.nn.conv2d_transpose(conv1, W_conv2, [100, 28, 28, 1], [1, 1, 1, 1]) + b_conv2)
+    conv2 = tf.reshape(conv2, [-1, 784])
 
-    return conv1
+    return conv2
 
 def discriminator(x):
-    W1 = tf.get_variable('W1', [784, 3500], initializer=initializer)
-    b1 = tf.get_variable('b1', [3500], initializer=tf.constant_initializer(0.0))
+    x_image = tf.reshape(x, [-1, 28, 28, 1])
+
+    W_conv1 = tf.get_variable('W_conv1', [5, 5, 1, 32], initializer=initializer)
+    b_conv1 = tf.get_variable('b_conv1', [32], initializer=tf.constant_initializer(0.0))
+
+    h_conv1 = lrelu(tf.nn.conv2d(x_image, W_conv1, strides=[1, 1, 1, 1], padding='SAME') + b_conv1)
+    h_pool1 = tf.nn.max_pool(h_conv1, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+
+    W_conv2 = tf.get_variable('W_conv2', [5, 5, 32, 64], initializer=initializer)
+    b_conv2 = tf.get_variable('b_conv2', [64], initializer=tf.constant_initializer(0.0))
+
+    h_conv2 = lrelu(tf.nn.conv2d(h_pool1, W_conv2, strides=[1, 1, 1, 1], padding='SAME') + b_conv2)
+    h_pool2 = tf.nn.max_pool(h_conv2, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+
+    h_pool2_flat = tf.reshape(h_pool2, [-1, 7*7*64])
+
+    W1 = tf.get_variable('W1', [7*7*64, 1024], initializer=initializer)
+    b1 = tf.get_variable('b1', [1024], initializer=tf.constant_initializer(0.0))
     
-    f1 = lrelu(tf.matmul(x, W1) + b1)
+    f1 = lrelu(tf.matmul(h_pool2_flat, W1) + b1)
 
-    W2 = tf.get_variable('W2', [3500, 3500], initializer=initializer)
-    b2 = tf.get_variable('b2', [3500], initializer=tf.constant_initializer(0.0))
+    W2 = tf.get_variable('W2', [1024, 1], initializer=initializer)
+    b2 = tf.get_variable('b2', [1], initializer=tf.constant_initializer(0.0))
 
-    f2 = lrelu(tf.matmul(f1, W2) + b2)
+    f2 = tf.nn.sigmoid(tf.matmul(f1, W2) + b2)
 
-    W3 = tf.get_variable('W3', [3500, 1], initializer=initializer)
-    b3 = tf.get_variable('b3', [1], initializer=tf.constant_initializer(0.0))
+    return f2
 
-    f3 = tf.nn.sigmoid(tf.matmul(f2, W3) + b3)
+    # W3 = tf.get_variable('W3', [3500, 1], initializer=initializer)
+    # b3 = tf.get_variable('b3', [1], initializer=tf.constant_initializer(0.0))
 
-    return f3
+    # f3 = tf.nn.sigmoid(tf.matmul(f2, W3) + b3)
+
+    # return f3
 
 with tf.variable_scope('G'):
     z = tf.placeholder(tf.float32, [100, 25])
@@ -138,7 +156,7 @@ with tf.Session() as session:
         # print("Dg!!!!!!!!")
         # print(dg[:9])
         # update generator
-        for i in range(7):
+        for i in range(5):
             input_noise = np.random.rand(100, 25)
             loss_g_thingy, _ = session.run([loss_g, g_opt], {z: input_noise})
 
