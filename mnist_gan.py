@@ -45,26 +45,21 @@ def generator(z):
     
     f1 = tf.nn.sigmoid(tf.matmul(z, fcW1) + fcb1)
 
-    W2 = tf.get_variable('W2', [1024, 28 * 28 * 64], initializer=initializer)
-    b2 = tf.get_variable('b2', [28 * 28 * 64], initializer=tf.constant_initializer(0.0))
+    W2 = tf.get_variable('W2', [1024, 7 * 7 * 64], initializer=initializer)
+    b2 = tf.get_variable('b2', [7 * 7 * 64], initializer=tf.constant_initializer(0.0))
 
     f2 = tf.nn.sigmoid(tf.matmul(f1, W2) + b2)
-    f2 = tf.reshape(f2, [-1, 28, 28, 64])
-
-    # W3 = tf.get_variable('W3', [3500, 784], initializer=initializer)
-    # b3 = tf.get_variable('b3', [784], initializer=tf.constant_initializer(0.0))
-
-    # f3 = tf.nn.tanh(tf.matmul(f2, W3) + b3)
+    f2 = tf.reshape(f2, [-1, 7, 7, 64])
 
     W_conv1 = tf.get_variable('W_conv1', [5, 5, 32, 64], initializer=initializer)
-    b_conv1 = tf.get_variable('b_conv1', [28, 28, 32], initializer=tf.constant_initializer(0.0))
+    b_conv1 = tf.get_variable('b_conv1', [14, 14, 32], initializer=tf.constant_initializer(0.0))
 
-    conv1 = tf.nn.sigmoid(tf.nn.conv2d_transpose(f2, W_conv1, [100, 28, 28, 32], [1, 1, 1, 1]) + b_conv1)
+    conv1 = tf.nn.sigmoid(tf.nn.conv2d_transpose(f2, W_conv1, [100, 14, 14, 32], [1, 2, 2, 1]) + b_conv1)
 
     W_conv2 = tf.get_variable('W_conv2', [5, 5, 1, 32], initializer=initializer)
     b_conv2 = tf.get_variable('b_conv2', [28, 28, 1], initializer=tf.constant_initializer(0.0))
 
-    conv2 = tf.nn.tanh(tf.nn.conv2d_transpose(conv1, W_conv2, [100, 28, 28, 1], [1, 1, 1, 1]) + b_conv2)
+    conv2 = tf.nn.tanh(tf.nn.conv2d_transpose(conv1, W_conv2, [100, 28, 28, 1], [1, 2, 2, 1]) + b_conv2)
     conv2 = tf.reshape(conv2, [-1, 784])
 
     return conv2
@@ -114,13 +109,6 @@ def discriminator(x):
 
     return f2
 
-    # W3 = tf.get_variable('W3', [3500, 1], initializer=initializer)
-    # b3 = tf.get_variable('b3', [1], initializer=tf.constant_initializer(0.0))
-
-    # f3 = tf.nn.sigmoid(tf.matmul(f2, W3) + b3)
-
-    # return f3
-
 with tf.variable_scope('G'):
     z = tf.placeholder(tf.float32, [100, 25])
     G = generator(z)
@@ -162,15 +150,9 @@ with tf.Session() as session:
         # update discriminator
         mnist_images, _ = mnist.train.next_batch(100)
         mnist_images = (mnist_images - 0.5) * 2.0
-        # print(mnist_images[0])
         input_noise = np.random.rand(100, 25)
-        # print(input_noise)
         loss_d_thingy, _, dx, dg = session.run([loss_d, d_opt, Dx, Dg], {x: mnist_images, z: input_noise})
 
-        # print("Dx!!!!!!!!")
-        # print(dx[:9])
-        # print("Dg!!!!!!!!")
-        # print(dg[:9])
         # update generator
         for i in range(10):
             input_noise = np.random.rand(100, 25)
@@ -182,5 +164,4 @@ with tf.Session() as session:
         if step % 100 == 0:
             input_noise = np.random.rand(100, 25)
             image = session.run(G, {z: input_noise})
-            # print(image[0])
             save_images(np.reshape(image, [100, 28, 28]), [10, 10], 'generated_images/fig{}.png'.format(step))
