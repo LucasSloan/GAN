@@ -45,21 +45,21 @@ def generator(z):
     
     f1 = tf.nn.sigmoid(tf.matmul(z, fcW1) + fcb1)
 
-    W2 = tf.get_variable('W2', [1024, 7 * 7 * 64], initializer=initializer)
-    b2 = tf.get_variable('b2', [7 * 7 * 64], initializer=tf.constant_initializer(0.0))
+    W2 = tf.get_variable('W2', [1024, 8 * 8 * 64], initializer=initializer)
+    b2 = tf.get_variable('b2', [8 * 8 * 64], initializer=tf.constant_initializer(0.0))
 
     f2 = tf.nn.sigmoid(tf.matmul(f1, W2) + b2)
-    f2 = tf.reshape(f2, [-1, 7, 7, 64])
+    f2 = tf.reshape(f2, [-1, 8, 8, 64])
 
     W_conv1 = tf.get_variable('W_conv1', [5, 5, 32, 64], initializer=initializer)
-    b_conv1 = tf.get_variable('b_conv1', [14, 14, 32], initializer=tf.constant_initializer(0.0))
+    b_conv1 = tf.get_variable('b_conv1', [16, 16, 32], initializer=tf.constant_initializer(0.0))
 
-    conv1 = tf.nn.sigmoid(tf.nn.conv2d_transpose(f2, W_conv1, [100, 14, 14, 32], [1, 2, 2, 1]) + b_conv1)
+    conv1 = tf.nn.sigmoid(tf.nn.conv2d_transpose(f2, W_conv1, [100, 16, 16, 32], [1, 2, 2, 1]) + b_conv1)
 
     W_conv2 = tf.get_variable('W_conv2', [5, 5, 1, 32], initializer=initializer)
-    b_conv2 = tf.get_variable('b_conv2', [28, 28, 1], initializer=tf.constant_initializer(0.0))
+    b_conv2 = tf.get_variable('b_conv2', [32, 32, 1], initializer=tf.constant_initializer(0.0))
 
-    conv2 = tf.nn.tanh(tf.nn.conv2d_transpose(conv1, W_conv2, [100, 28, 28, 1], [1, 2, 2, 1]) + b_conv2)
+    conv2 = tf.nn.tanh(tf.nn.conv2d_transpose(conv1, W_conv2, [100, 32, 32, 1], [1, 2, 2, 1]) + b_conv2)
 
     return conv2
 
@@ -88,11 +88,11 @@ def discriminator(x):
     h_conv2 = lrelu(tf.nn.conv2d(h_pool1, W_conv2, strides=[1, 1, 1, 1], padding='SAME') + b_conv2)
     h_pool2 = tf.nn.max_pool(h_conv2, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
 
-    h_pool2_flat = tf.reshape(h_pool2, [-1, 7*7*64])
+    h_pool2_flat = tf.reshape(h_pool2, [-1, 8*8*64])
 
     minibatch = minibatch_layer(h_pool2_flat, 5, 3)
 
-    W1 = tf.get_variable('W1', [7*7*64 + 5, 1024], initializer=initializer)
+    W1 = tf.get_variable('W1', [8*8*64 + 5, 1024], initializer=initializer)
     b1 = tf.get_variable('b1', [1024], initializer=tf.constant_initializer(0.0))
     
     f1 = lrelu(tf.matmul(minibatch, W1) + b1)
@@ -108,7 +108,7 @@ with tf.variable_scope('G'):
     z = tf.placeholder(tf.float32, [100, 25])
     G = generator(z)
 
-x = tf.placeholder(tf.float32, [None, 28, 28, 1])
+x = tf.placeholder(tf.float32, [None, 32, 32, 1])
 with tf.variable_scope('D'):
     Dx = discriminator(x)
 with tf.variable_scope('D', reuse=True):
@@ -145,6 +145,7 @@ with tf.Session() as session:
         # update discriminator
         mnist_images, _ = mnist.train.next_batch(100)
         mnist_images = (np.reshape(mnist_images, [100, 28, 28, 1]) - 0.5) * 2.0
+        mnist_images = np.lib.pad(mnist_images, ((0,0),(2,2),(2,2),(0,0)),'constant', constant_values=(-1, -1))
         input_noise = np.random.rand(100, 25)
         loss_d_thingy, _, dx, dg = session.run([loss_d, d_opt, Dx, Dg], {x: mnist_images, z: input_noise})
 
@@ -159,4 +160,4 @@ with tf.Session() as session:
         if step % 100 == 0:
             input_noise = np.random.rand(100, 25)
             image = session.run(G, {z: input_noise})
-            save_images(np.reshape(image, [100, 28, 28]), [10, 10], 'generated_images/fig{}.png'.format(step))
+            save_images(np.reshape(image, [100, 32, 32]), [10, 10], 'generated_images/fig{}.png'.format(step))
