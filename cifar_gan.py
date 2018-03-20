@@ -2,15 +2,18 @@
 import tensorflow as tf
 import numpy as np
 import imageio
+import time
 
+import os
 from os import listdir
 from os.path import isfile, join
 
 def _parse_function(filename):
   image_string = tf.read_file(filename)
   image_decoded = tf.image.decode_png(image_string, channels=1)
-  image_resized = tf.image.resize_images(image_decoded, [32, 32])
-  return image_resized
+  image_normalized = tf.image.convert_image_dtype(image_decoded, tf.float32)
+  image_cropped = tf.image.crop_to_bounding_box(image_normalized, 4, 4, 32, 32)
+  return image_cropped
 
 def load_images(batch_size):
     dataset = tf.data.Dataset.list_files("E:\\cifar10\\train\\*")
@@ -32,13 +35,10 @@ def lrelu(x, leak=0.2, name="lrelu"):
 #The below functions are taken from carpdem20's implementation https://github.com/carpedm20/DCGAN-tensorflow
 #They allow for saving sample images from the generator to follow progress
 def save_images(images, size, image_path):
-    return imsave(inverse_transform(images), size, image_path)
+    return imsave(images, size, image_path)
 
 def imsave(images, size, path):
     return imageio.imwrite(path, merge(images, size))
-
-def inverse_transform(images):
-    return (images+1.)/2.
 
 def merge(images, size):
     h, w = images.shape[1], images.shape[2]
@@ -75,7 +75,7 @@ def generator(z):
     W_conv2 = tf.get_variable('W_conv2', [5, 5, 1, 32], initializer=initializer)
     b_conv2 = tf.get_variable('b_conv2', [32, 32, 1], initializer=tf.constant_initializer(0.0))
 
-    conv2 = tf.nn.tanh(tf.nn.conv2d_transpose(conv1, W_conv2, [100, 32, 32, 1], [1, 2, 2, 1]) + b_conv2)
+    conv2 = tf.nn.sigmoid(tf.nn.conv2d_transpose(conv1, W_conv2, [100, 32, 32, 1], [1, 2, 2, 1]) + b_conv2)
 
     return conv2
 
@@ -147,6 +147,8 @@ with tf.Session() as session:
     tf.local_variables_initializer().run()
     tf.global_variables_initializer().run()
 
+    start_time = time.time()
+    sample_directory = 'generated_images/cifar/{}'.format(start_time)
     for step in range(10000):
         # update discriminator
         input_noise = np.random.rand(100, 25)
@@ -161,5 +163,9 @@ with tf.Session() as session:
 
         if step % 100 == 0:
             input_noise = np.random.rand(100, 25)
-            image = session.run(G, {z: input_noise})
-            save_images(np.reshape(image, [100, 32, 32]), [10, 10], 'generated_images/fig{}.png'.format(step))  
+            gen_image = session.run(G, {z: input_noise})
+            real_image = session.run(x)
+            if not os.path.exists(sample_directory):
+                os.makedirs(sample_directory)
+            save_images(np.reshape(gen_image, [100, 32, 32]), [10, 10], sample_directory + '/{}gen.png'.format(step))
+            save_images(np.reshape(real_image, [100, 32, 32]), [10, 10], sample_directory + '/{}real.png'.format(step))
