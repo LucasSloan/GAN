@@ -13,15 +13,15 @@ def _parse_function(filename):
   image_decoded = tf.image.decode_png(image_string, channels=1)
   image_normalized = tf.image.convert_image_dtype(image_decoded, tf.float32)
   image_cropped = tf.image.crop_to_bounding_box(image_normalized, 4, 4, 32, 32)
-  return image_cropped
+  image_flipped = tf.image.random_flip_left_right(image_cropped)
+  return image_flipped
 
 def load_images(batch_size):
     dataset = tf.data.Dataset.list_files("E:\\cifar10\\train\\*")
     dataset = dataset.map(_parse_function, num_parallel_calls=4)
     dataset = dataset.batch(batch_size)
-    dataset = dataset.repeat()
+    dataset = dataset.apply(tf.contrib.data.shuffle_and_repeat(10000))
     dataset = dataset.prefetch(batch_size)
-    # dataset = dataset.shuffle(10000)
     return dataset.make_one_shot_iterator()
 
 
@@ -152,7 +152,7 @@ with tf.Session() as session:
 
     start_time = time.time()
     sample_directory = 'generated_images/cifar/{}'.format(start_time)
-    for step in range(10000):
+    for step in range(100000):
         # update discriminator
         input_noise = np.random.rand(100, 25)
         loss_d_thingy, _ = session.run([loss_d, d_opt], {z: input_noise})
