@@ -60,17 +60,20 @@ def generator(z):
     fcb1 = tf.get_variable('fcb1', [1024], initializer=tf.constant_initializer(0.0))
     
     f1 = tf.nn.sigmoid(tf.matmul(z, fcW1) + fcb1)
+    f1 = tf.layers.batch_normalization(f1)
 
     W2 = tf.get_variable('W2', [1024, 8 * 8 * 64], initializer=initializer)
     b2 = tf.get_variable('b2', [8 * 8 * 64], initializer=tf.constant_initializer(0.0))
 
     f2 = tf.nn.sigmoid(tf.matmul(f1, W2) + b2)
+    f2 = tf.layers.batch_normalization(f2)
     f2 = tf.reshape(f2, [-1, 8, 8, 64])
 
     W_conv1 = tf.get_variable('W_conv1', [5, 5, 32, 64], initializer=initializer)
     b_conv1 = tf.get_variable('b_conv1', [16, 16, 32], initializer=tf.constant_initializer(0.0))
 
     conv1 = tf.nn.sigmoid(tf.nn.conv2d_transpose(f2, W_conv1, [100, 16, 16, 32], [1, 2, 2, 1]) + b_conv1)
+    conv1 = tf.layers.batch_normalization(conv1)
 
     W_conv2 = tf.get_variable('W_conv2', [5, 5, 1, 32], initializer=initializer)
     b_conv2 = tf.get_variable('b_conv2', [32, 32, 1], initializer=tf.constant_initializer(0.0))
@@ -106,9 +109,9 @@ def discriminator(x):
 
     h_pool2_flat = tf.reshape(h_pool2, [-1, 8*8*64])
 
-    minibatch = minibatch_layer(h_pool2_flat, 5, 3)
+    minibatch = minibatch_layer(h_pool2_flat, 10, 6)
 
-    W1 = tf.get_variable('W1', [8*8*64 + 5, 1024], initializer=initializer)
+    W1 = tf.get_variable('W1', [8*8*64 + 10, 1024], initializer=initializer)
     b1 = tf.get_variable('b1', [1024], initializer=tf.constant_initializer(0.0))
     
     f1 = lrelu(tf.matmul(minibatch, W1) + b1)
@@ -155,8 +158,9 @@ with tf.Session() as session:
         loss_d_thingy, _ = session.run([loss_d, d_opt], {z: input_noise})
 
         # update generator
-        input_noise = np.random.rand(100, 25)
-        loss_g_thingy, _ = session.run([loss_g, g_opt], {z: input_noise})
+        for i in range(10):
+            input_noise = np.random.rand(100, 25)
+            loss_g_thingy, _ = session.run([loss_g, g_opt], {z: input_noise})
 
         if step % 100 == 0:
             print('{}: discriminator loss {:.8f}\tgenerator loss {:.8f}'.format(step, loss_d_thingy, loss_g_thingy))
