@@ -5,8 +5,6 @@ import imageio
 import time
 
 import os
-from os import listdir
-from os.path import isfile, join
 
 def parse_images(filename):
   image_string = tf.read_file(filename)

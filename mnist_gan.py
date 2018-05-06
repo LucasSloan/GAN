@@ -2,6 +2,8 @@
 import tensorflow as tf
 import numpy as np
 import imageio
+import time
+import os
 
 from tensorflow.examples.tutorials.mnist import input_data
 mnist = input_data.read_data_sets("../tensorflow_learning/MNIST/MNIST_data/", one_hot=True)
@@ -141,6 +143,8 @@ with tf.Session() as session:
     tf.local_variables_initializer().run()
     tf.global_variables_initializer().run()
 
+    start_time = time.time()
+    sample_directory = 'generated_images/mnist/{}'.format(start_time)
     for step in range(10000):
         # update discriminator
         mnist_images, _ = mnist.train.next_batch(100)
@@ -160,4 +164,6 @@ with tf.Session() as session:
         if step % 100 == 0:
             input_noise = np.random.rand(100, 25)
             image = session.run(G, {z: input_noise})
-            save_images(np.reshape(image, [100, 32, 32]), [10, 10], 'generated_images/fig{}.png'.format(step))
+            if not os.path.exists(sample_directory):
+                os.makedirs(sample_directory)
+            save_images(np.reshape(image, [100, 32, 32]), [10, 10], sample_directory + '/fig{}.png'.format(step))
