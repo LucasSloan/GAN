@@ -8,7 +8,7 @@ import os
 
 def parse_images(filename):
   image_string = tf.read_file(filename)
-  image_decoded = tf.image.decode_png(image_string, channels=1)
+  image_decoded = tf.image.decode_png(image_string)
   image_normalized = tf.image.convert_image_dtype(image_decoded, tf.float32)
   image_flipped = tf.image.random_flip_left_right(image_normalized)
   return image_flipped
@@ -28,8 +28,8 @@ def load_images_and_labels(batch_size):
     dataset = tf.data.Dataset.zip((image_dataset, label_dataset))
 
     dataset = dataset.batch(batch_size)
-    # dataset = dataset.repeat()
-    dataset = dataset.apply(tf.contrib.data.shuffle_and_repeat(10000))
+    dataset = dataset.repeat()
+    # dataset = dataset.apply(tf.contrib.data.shuffle_and_repeat(10000))
     dataset = dataset.prefetch(batch_size)
     return dataset.make_one_shot_iterator()
 
@@ -50,8 +50,8 @@ def imsave(images, size, path):
     return imageio.imwrite(path, merge(images, size))
 
 def merge(images, size):
-    h, w = images.shape[1], images.shape[2]
-    img = np.zeros((h * size[0], w * size[1]))
+    h, w, c = images.shape[1], images.shape[2], images.shape[3]
+    img = np.zeros((h * size[0], w * size[1], c))
 
     for idx, image in enumerate(images):
         i = idx % size[1]
@@ -90,10 +90,10 @@ def generator(z):
     conv2 = tf.nn.sigmoid(tf.nn.conv2d_transpose(conv1, W_conv2, [100, 16, 16, 32], [1, 2, 2, 1]) + b_conv2)
     conv2 = tf.layers.batch_normalization(conv2, fused=True)
 
-    W_conv3 = tf.get_variable('W_conv3', [5, 5, 1, 32], initializer=initializer)
-    b_conv3 = tf.get_variable('b_conv3', [32, 32, 1], initializer=tf.constant_initializer(0.0))
+    W_conv3 = tf.get_variable('W_conv3', [5, 5, 3, 32], initializer=initializer)
+    b_conv3 = tf.get_variable('b_conv3', [32, 32, 3], initializer=tf.constant_initializer(0.0))
 
-    conv3 = tf.nn.sigmoid(tf.nn.conv2d_transpose(conv2, W_conv3, [100, 32, 32, 1], [1, 2, 2, 1]) + b_conv3)
+    conv3 = tf.nn.sigmoid(tf.nn.conv2d_transpose(conv2, W_conv3, [100, 32, 32, 3], [1, 2, 2, 1]) + b_conv3)
 
     return conv3
 
@@ -110,7 +110,7 @@ def minibatch_layer(input, num_kernels=5, kernel_dim=3):
     return tf.concat([input, minibatch_features], 1)
 
 def discriminator(x):
-    W_conv1 = tf.get_variable('W_conv1', [5, 5, 1, 32], initializer=initializer)
+    W_conv1 = tf.get_variable('W_conv1', [5, 5, 3, 32], initializer=initializer)
     b_conv1 = tf.get_variable('b_conv1', [32], initializer=tf.constant_initializer(0.0))
 
     h_conv1 = lrelu(tf.nn.conv2d(x, W_conv1, strides=[1, 1, 1, 1], padding='SAME') + b_conv1)
@@ -203,5 +203,5 @@ with tf.Session() as session:
             real_image = session.run(x)
             if not os.path.exists(sample_directory):
                 os.makedirs(sample_directory)
-            save_images(np.reshape(gen_image, [100, 32, 32]), [10, 10], sample_directory + '/{}gen.png'.format(step))
-            save_images(np.reshape(real_image, [100, 32, 32]), [10, 10], sample_directory + '/{}real.png'.format(step))
+            save_images(np.reshape(gen_image, [100, 32, 32, 3]), [10, 10], sample_directory + '/{}gen.png'.format(step))
+            save_images(np.reshape(real_image, [100, 32, 32, 3]), [10, 10], sample_directory + '/{}real.png'.format(step))
