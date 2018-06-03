@@ -6,12 +6,22 @@ import time
 
 import os
 
+def gaussian_noise_layer(input_layer, std):
+    noise = tf.random_normal(shape=tf.shape(input_layer), mean=0.0, stddev=std, dtype=tf.float32)
+    return input_layer + noise
+
 def parse_images(filename):
   image_string = tf.read_file(filename)
   image_decoded = tf.image.decode_png(image_string)
-  image_normalized = tf.image.convert_image_dtype(image_decoded, tf.float32)
-  image_flipped = tf.image.random_flip_left_right(image_normalized)
-  return image_flipped
+  image_flipped = tf.image.random_flip_left_right(image_decoded)
+  # image_rand_bright = tf.image.random_brightness(image_flipped, 0.3)
+  # image_rand_contrast = tf.image.random_contrast(image_rand_bright, 0.85, 1.15)
+  # image_rand_hue = tf.image.random_hue(image_rand_contrast, 0.15)
+  # image_rand_sat = tf.image.random_saturation(image_rand_hue, 0.85, 1.15)
+  image_normalized = tf.image.convert_image_dtype(image_flipped, tf.float32)
+#   image_noisy = gaussian_noise_layer(image_normalized, 0.05)
+#   image_clipped = tf.clip_by_value(image_noisy, 0.0, 1.0)
+  return image_normalized
 
 def text_to_one_hot(text_label):
     int_label = tf.string_to_number(text_label, out_type=tf.int32)
