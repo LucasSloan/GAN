@@ -30,7 +30,7 @@ def text_to_one_hot(text_label):
 
 def load_images_and_labels(batch_size):
     image_files_dataset = tf.data.Dataset.list_files("E:\\cifar10\\train\\*")
-    image_dataset = image_files_dataset.map(parse_images, num_parallel_calls=4)
+    image_dataset = image_files_dataset.map(parse_images, num_parallel_calls=8)
 
     label_lines_dataset = tf.data.TextLineDataset(["E:\\cifar10\\Train_cntk_text.txt"])
     label_dataset = label_lines_dataset.map(text_to_one_hot)
