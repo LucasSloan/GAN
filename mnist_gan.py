@@ -145,7 +145,7 @@ with tf.Session() as session:
 
     start_time = time.time()
     sample_directory = 'generated_images/mnist/{}'.format(start_time)
-    for step in range(10000):
+    for step in range(100000):
         # update discriminator
         mnist_images, _ = mnist.train.next_batch(100)
         mnist_images = (np.reshape(mnist_images, [100, 28, 28, 1]) - 0.5) * 2.0
@@ -154,9 +154,8 @@ with tf.Session() as session:
         loss_d_thingy, _, dx, dg = session.run([loss_d, d_opt, Dx, Dg], {x: mnist_images, z: input_noise})
 
         # update generator
-        for i in range(10):
-            input_noise = np.random.rand(100, 25)
-            loss_g_thingy, _ = session.run([loss_g, g_opt], {z: input_noise})
+        input_noise = np.random.rand(100, 25)
+        loss_g_thingy, _ = session.run([loss_g, g_opt], {z: input_noise})
 
         if step % 100 == 0:
             print('{}: discriminator loss {:.8f}\tgenerator loss {:.8f}'.format(step, loss_d_thingy, loss_g_thingy))
