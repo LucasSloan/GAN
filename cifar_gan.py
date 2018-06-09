@@ -190,6 +190,7 @@ with tf.Session() as session:
     tf.global_variables_initializer().run()
 
     start_time = time.time()
+    previous_step_time = time.time()
     sample_directory = 'generated_images/cifar/{}'.format(start_time)
     for step in range(1000000):
         # update discriminator
@@ -215,3 +216,8 @@ with tf.Session() as session:
                 os.makedirs(sample_directory)
             save_images(np.reshape(gen_image, [100, 32, 32, 3]), [10, 10], sample_directory + '/{}gen.png'.format(step))
             save_images(np.reshape(real_image, [100, 32, 32, 3]), [10, 10], sample_directory + '/{}real.png'.format(step))
+
+        if step % 100 == 0:
+            current_step_time = time.time()
+            print('{}: previous 100 steps took {:.4f}s'.format(step, current_step_time - previous_step_time))
+            previous_step_time = current_step_time
