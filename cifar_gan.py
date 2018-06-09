@@ -140,14 +140,14 @@ def discriminator(x):
 
     h_pool3_flat = tf.reshape(h_pool3, [-1, 4*4*128])
 
-    minibatch = minibatch_layer(h_pool3_flat, 10, 3)
+    minibatch = minibatch_layer(h_pool3_flat, 100, 5)
 
     # W1 = tf.get_variable('W1', [4*4*128 + 10, 2048], initializer=initializer)
     # b1 = tf.get_variable('b1', [2048], initializer=tf.constant_initializer(0.0))
     
     # f1 = lrelu(tf.matmul(minibatch, W1) + b1)
 
-    W2 = tf.get_variable('W2', [4*4*128 + 10, 11], initializer=initializer)
+    W2 = tf.get_variable('W2', [4*4*128 + 100, 11], initializer=initializer)
     b2 = tf.get_variable('b2', [11], initializer=tf.constant_initializer(0.0))
 
     f2 = tf.matmul(minibatch, W2) + b2
