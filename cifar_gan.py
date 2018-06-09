@@ -155,7 +155,7 @@ def discriminator(x):
     return f2
 
 with tf.variable_scope('G'):
-    z = tf.placeholder(tf.float32, [100, 25])
+    z = tf.random_uniform([100, 25])
     G = generator(z)
 
 images_and_labels = load_images_and_labels(100).get_next()
@@ -194,23 +194,19 @@ with tf.Session() as session:
     sample_directory = 'generated_images/cifar/{}'.format(start_time)
     for step in range(1000000):
         # update discriminator
-        input_noise = np.random.rand(100, 25)
-        loss_d_thingy, _ = session.run([loss_d, d_opt], {z: input_noise})
+        loss_d_thingy, _ = session.run([loss_d, d_opt])
 
         # update generator
         for i in range(15):
-            input_noise = np.random.rand(100, 25)
-            loss_g_thingy, _ = session.run([loss_g, g_opt], {z: input_noise})
+            loss_g_thingy, _ = session.run([loss_g, g_opt])
 
         if step % 100 == 0:
-            input_noise = np.random.rand(100, 25)
-            train_accuracy = session.run([accuracy], {z: input_noise})
+            train_accuracy = session.run([accuracy])
             print('{}: discriminator loss {:.8f}\tgenerator loss {:.8f}'.format(step, loss_d_thingy, loss_g_thingy))
             print('train accuracy: {}'.format(train_accuracy))
 
         if step % 100 == 0:
-            input_noise = np.random.rand(100, 25)
-            gen_image = session.run(G, {z: input_noise})
+            gen_image = session.run(G)
             real_image = session.run(x)
             if not os.path.exists(sample_directory):
                 os.makedirs(sample_directory)
