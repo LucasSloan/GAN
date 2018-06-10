@@ -4,6 +4,7 @@ import numpy as np
 import imageio
 import time
 import os
+import save_images
 
 from tensorflow.examples.tutorials.mnist import input_data
 mnist = input_data.read_data_sets("../tensorflow_learning/MNIST/MNIST_data/", one_hot=True)
@@ -14,29 +15,6 @@ def lrelu(x, leak=0.2, name="lrelu"):
          f1 = 0.5 * (1 + leak)
          f2 = 0.5 * (1 - leak)
          return f1 * x + f2 * abs(x)
-
-#The below functions are taken from carpdem20's implementation https://github.com/carpedm20/DCGAN-tensorflow
-#They allow for saving sample images from the generator to follow progress
-def save_images(images, size, image_path):
-    return imsave(inverse_transform(images), size, image_path)
-
-def imsave(images, size, path):
-    return imageio.imwrite(path, merge(images, size))
-
-def inverse_transform(images):
-    return (images+1.)/2.
-
-def merge(images, size):
-    h, w = images.shape[1], images.shape[2]
-    img = np.zeros((h * size[0], w * size[1]))
-
-    for idx, image in enumerate(images):
-        i = idx % size[1]
-        j = idx // size[1]
-        img[j*h:j*h+h, i*w:i*w+w] = image
-
-    return img
-
 
 initializer = tf.truncated_normal_initializer(stddev=0.02)
 
@@ -158,4 +136,4 @@ with tf.Session() as session:
             image = session.run(G, {z: input_noise})
             if not os.path.exists(sample_directory):
                 os.makedirs(sample_directory)
-            save_images(np.reshape(image, [100, 32, 32]), [10, 10], sample_directory + '/fig{}.png'.format(step))
+            save_images.save_images(np.reshape(image, [100, 32, 32, 1]), [10, 10], sample_directory + '/fig{}.png'.format(step))

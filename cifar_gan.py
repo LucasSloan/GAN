@@ -1,10 +1,11 @@
 """Basic GAN to generate mnist images."""
 import tensorflow as tf
 import numpy as np
-import imageio
 import time
 
 import os
+
+import save_images
 
 def gaussian_noise_layer(input_layer, std):
     noise = tf.random_normal(shape=tf.shape(input_layer), mean=0.0, stddev=std, dtype=tf.float32)
@@ -18,7 +19,7 @@ def parse_images(filename):
   # image_rand_contrast = tf.image.random_contrast(image_rand_bright, 0.85, 1.15)
   # image_rand_hue = tf.image.random_hue(image_rand_contrast, 0.15)
   # image_rand_sat = tf.image.random_saturation(image_rand_hue, 0.85, 1.15)
-  image_normalized = tf.image.convert_image_dtype(image_flipped, tf.float32)
+  image_normalized = 2.0 * tf.image.convert_image_dtype(image_flipped, tf.float32) - 1.0
 #   image_noisy = gaussian_noise_layer(image_normalized, 0.05)
 #   image_clipped = tf.clip_by_value(image_noisy, 0.0, 1.0)
   return image_normalized
@@ -51,24 +52,6 @@ def lrelu(x, leak=0.2, name="lrelu"):
          f2 = 0.5 * (1 - leak)
          return f1 * x + f2 * abs(x)
 
-#The below functions are taken from carpdem20's implementation https://github.com/carpedm20/DCGAN-tensorflow
-#They allow for saving sample images from the generator to follow progress
-def save_images(images, size, image_path):
-    return imsave(images, size, image_path)
-
-def imsave(images, size, path):
-    return imageio.imwrite(path, merge(images, size))
-
-def merge(images, size):
-    h, w, c = images.shape[1], images.shape[2], images.shape[3]
-    img = np.zeros((h * size[0], w * size[1], c))
-
-    for idx, image in enumerate(images):
-        i = idx % size[1]
-        j = idx // size[1]
-        img[j*h:j*h+h, i*w:i*w+w] = image
-
-    return img
 
 
 initializer = tf.truncated_normal_initializer(stddev=0.02)
@@ -103,7 +86,7 @@ def generator(z):
     W_conv3 = tf.get_variable('W_conv3', [5, 5, 3, 32], initializer=initializer)
     b_conv3 = tf.get_variable('b_conv3', [32, 32, 3], initializer=tf.constant_initializer(0.0))
 
-    conv3 = tf.nn.sigmoid(tf.nn.conv2d_transpose(conv2, W_conv3, [100, 32, 32, 3], [1, 2, 2, 1]) + b_conv3)
+    conv3 = tf.nn.tanh(tf.nn.conv2d_transpose(conv2, W_conv3, [100, 32, 32, 3], [1, 2, 2, 1]) + b_conv3)
 
     return conv3
 
@@ -210,8 +193,8 @@ with tf.Session() as session:
             real_image = session.run(x)
             if not os.path.exists(sample_directory):
                 os.makedirs(sample_directory)
-            save_images(np.reshape(gen_image, [100, 32, 32, 3]), [10, 10], sample_directory + '/{}gen.png'.format(step))
-            save_images(np.reshape(real_image, [100, 32, 32, 3]), [10, 10], sample_directory + '/{}real.png'.format(step))
+            save_images.save_images(np.reshape(gen_image, [100, 32, 32, 3]), [10, 10], sample_directory + '/{}gen.png'.format(step))
+            save_images.save_images(np.reshape(real_image, [100, 32, 32, 3]), [10, 10], sample_directory + '/{}real.png'.format(step))
 
         if step % 100 == 0:
             current_step_time = time.time()
