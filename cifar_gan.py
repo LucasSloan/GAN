@@ -6,10 +6,7 @@ import time
 import os
 
 import save_images
-
-def gaussian_noise_layer(input_layer, std):
-    noise = tf.random_normal(shape=tf.shape(input_layer), mean=0.0, stddev=std, dtype=tf.float32)
-    return input_layer + noise
+import custom_layers
 
 def parse_images(filename):
   image_string = tf.read_file(filename)
@@ -20,7 +17,7 @@ def parse_images(filename):
   # image_rand_hue = tf.image.random_hue(image_rand_contrast, 0.15)
   # image_rand_sat = tf.image.random_saturation(image_rand_hue, 0.85, 1.15)
   image_normalized = 2.0 * tf.image.convert_image_dtype(image_flipped, tf.float32) - 1.0
-#   image_noisy = gaussian_noise_layer(image_normalized, 0.05)
+#   image_noisy = custom_layers.gaussian_noise_layer(image_normalized, 0.05)
 #   image_clipped = tf.clip_by_value(image_noisy, 0.0, 1.0)
   return image_normalized
 
@@ -43,15 +40,6 @@ def load_images_and_labels(batch_size):
     # dataset = dataset.apply(tf.contrib.data.shuffle_and_repeat(10000))
     dataset = dataset.prefetch(batch_size)
     return dataset.make_one_shot_iterator()
-
-
-#This function performns a leaky relu activation, which is needed for the discriminator network.
-def lrelu(x, leak=0.2, name="lrelu"):
-     with tf.variable_scope(name):
-         f1 = 0.5 * (1 + leak)
-         f2 = 0.5 * (1 - leak)
-         return f1 * x + f2 * abs(x)
-
 
 
 initializer = tf.truncated_normal_initializer(stddev=0.02)
@@ -90,40 +78,28 @@ def generator(z):
 
     return conv3
 
-def minibatch_layer(input, num_kernels=5, kernel_dim=3):
-    mb_fc_W = tf.get_variable('mb_fc_W', [input.get_shape()[1], num_kernels * kernel_dim], initializer=initializer)
-    mb_fc_b = tf.get_variable('mb_fc_b', [num_kernels * kernel_dim], initializer=tf.constant_initializer(0.0))
-
-    mb_fc = tf.matmul(input, mb_fc_W) + mb_fc_b
-
-    activation = tf.reshape(mb_fc, [-1, num_kernels, kernel_dim])
-    diffs = tf.expand_dims(activation, 3) - tf.expand_dims(tf.transpose(activation, [1, 2, 0]), 0)
-    abs_diffs = tf.reduce_sum(tf.abs(diffs), 2)
-    minibatch_features = tf.reduce_sum(tf.exp(-abs_diffs), 2)
-    return tf.concat([input, minibatch_features], 1)
-
 def discriminator(x):
     W_conv1 = tf.get_variable('W_conv1', [5, 5, 3, 32], initializer=initializer)
     b_conv1 = tf.get_variable('b_conv1', [32], initializer=tf.constant_initializer(0.0))
 
-    h_conv1 = lrelu(tf.nn.conv2d(x, W_conv1, strides=[1, 1, 1, 1], padding='SAME') + b_conv1)
+    h_conv1 = custom_layers.lrelu(tf.nn.conv2d(x, W_conv1, strides=[1, 1, 1, 1], padding='SAME') + b_conv1)
     h_pool1 = tf.nn.max_pool(h_conv1, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
 
     W_conv2 = tf.get_variable('W_conv2', [5, 5, 32, 64], initializer=initializer)
     b_conv2 = tf.get_variable('b_conv2', [64], initializer=tf.constant_initializer(0.0))
 
-    h_conv2 = lrelu(tf.nn.conv2d(h_pool1, W_conv2, strides=[1, 1, 1, 1], padding='SAME') + b_conv2)
+    h_conv2 = custom_layers.lrelu(tf.nn.conv2d(h_pool1, W_conv2, strides=[1, 1, 1, 1], padding='SAME') + b_conv2)
     h_pool2 = tf.nn.max_pool(h_conv2, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
 
     W_conv3 = tf.get_variable('W_conv3', [5, 5, 64, 128], initializer=initializer)
     b_conv3 = tf.get_variable('b_conv3', [128], initializer=tf.constant_initializer(0.0))
 
-    h_conv3 = lrelu(tf.nn.conv2d(h_pool2, W_conv3, strides=[1, 1, 1, 1], padding='SAME') + b_conv3)
+    h_conv3 = custom_layers.lrelu(tf.nn.conv2d(h_pool2, W_conv3, strides=[1, 1, 1, 1], padding='SAME') + b_conv3)
     h_pool3 = tf.nn.max_pool(h_conv3, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
 
     h_pool3_flat = tf.reshape(h_pool3, [-1, 4*4*128])
 
-    minibatch = minibatch_layer(h_pool3_flat, 100, 5)
+    minibatch = custom_layers.minibatch_layer(h_pool3_flat, initializer, 100, 5)
 
     # W1 = tf.get_variable('W1', [4*4*128 + 10, 2048], initializer=initializer)
     # b1 = tf.get_variable('b1', [2048], initializer=tf.constant_initializer(0.0))

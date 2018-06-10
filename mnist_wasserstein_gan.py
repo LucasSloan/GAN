@@ -5,16 +5,10 @@ import imageio
 import time
 import os
 import save_images
+import custom_layers
 
 from tensorflow.examples.tutorials.mnist import input_data
 mnist = input_data.read_data_sets("../tensorflow_learning/MNIST/MNIST_data/", one_hot=True)
-
-#This function performns a leaky relu activation, which is needed for the discriminator network.
-def lrelu(x, leak=0.2, name="lrelu"):
-     with tf.variable_scope(name):
-         f1 = 0.5 * (1 + leak)
-         f2 = 0.5 * (1 - leak)
-         return f1 * x + f2 * abs(x)
 
 initializer = tf.truncated_normal_initializer(stddev=0.02)
 
@@ -47,13 +41,13 @@ def discriminator(x):
     W_conv1 = tf.get_variable('W_conv1', [5, 5, 1, 32], initializer=initializer)
     b_conv1 = tf.get_variable('b_conv1', [32], initializer=tf.constant_initializer(0.0))
 
-    h_conv1 = lrelu(tf.nn.conv2d(x, W_conv1, strides=[1, 1, 1, 1], padding='SAME') + b_conv1)
+    h_conv1 = custom_layers.lrelu(tf.nn.conv2d(x, W_conv1, strides=[1, 1, 1, 1], padding='SAME') + b_conv1)
     h_pool1 = tf.nn.max_pool(h_conv1, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
 
     W_conv2 = tf.get_variable('W_conv2', [5, 5, 32, 64], initializer=initializer)
     b_conv2 = tf.get_variable('b_conv2', [64], initializer=tf.constant_initializer(0.0))
 
-    h_conv2 = lrelu(tf.nn.conv2d(h_pool1, W_conv2, strides=[1, 1, 1, 1], padding='SAME') + b_conv2)
+    h_conv2 = custom_layers.lrelu(tf.nn.conv2d(h_pool1, W_conv2, strides=[1, 1, 1, 1], padding='SAME') + b_conv2)
     h_pool2 = tf.nn.max_pool(h_conv2, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
 
     h_pool2_flat = tf.reshape(h_pool2, [-1, 8*8*64])
@@ -61,7 +55,7 @@ def discriminator(x):
     W1 = tf.get_variable('W1', [8*8*64, 1024], initializer=initializer)
     b1 = tf.get_variable('b1', [1024], initializer=tf.constant_initializer(0.0))
     
-    f1 = lrelu(tf.matmul(h_pool2_flat, W1) + b1)
+    f1 = custom_layers.lrelu(tf.matmul(h_pool2_flat, W1) + b1)
 
     W2 = tf.get_variable('W2', [1024, 1], initializer=initializer)
     b2 = tf.get_variable('b2', [1], initializer=tf.constant_initializer(0.0))
