@@ -8,18 +8,17 @@ import os
 import save_images
 import custom_layers
 
+cifar_categories = ["airplane", "automobile", "bird", "cat", "deer", "dog", "frog", "horse", "ship", "truck"]
+
 def parse_images(filename):
   image_string = tf.read_file(filename)
   image_decoded = tf.image.decode_png(image_string)
   image_flipped = tf.image.random_flip_left_right(image_decoded)
-  # image_rand_bright = tf.image.random_brightness(image_flipped, 0.3)
-  # image_rand_contrast = tf.image.random_contrast(image_rand_bright, 0.85, 1.15)
-  # image_rand_hue = tf.image.random_hue(image_rand_contrast, 0.15)
-  # image_rand_sat = tf.image.random_saturation(image_rand_hue, 0.85, 1.15)
   image_normalized = 2.0 * tf.image.convert_image_dtype(image_flipped, tf.float32) - 1.0
-#   image_noisy = custom_layers.gaussian_noise_layer(image_normalized, 0.05)
-#   image_clipped = tf.clip_by_value(image_noisy, 0.0, 1.0)
   return image_normalized
+
+def text_to_index(text_label):
+    return tf.string_to_number(text_label, out_type=tf.int32)
 
 def text_to_one_hot(text_label):
     int_label = tf.string_to_number(text_label, out_type=tf.int32)
@@ -28,12 +27,14 @@ def text_to_one_hot(text_label):
 
 def load_images_and_labels(batch_size):
     image_files_dataset = tf.data.Dataset.list_files("E:\\cifar10\\train\\*")
+    image_files_dataset = image_files_dataset.concatenate(tf.data.Dataset.list_files("E:\\cifar10\\test\\*"))
     image_dataset = image_files_dataset.map(parse_images, num_parallel_calls=8)
 
-    label_lines_dataset = tf.data.TextLineDataset(["E:\\cifar10\\Train_cntk_text.txt"])
+    label_lines_dataset = tf.data.TextLineDataset(["E:\\cifar10\\Train_cntk_text.txt", "E:\\cifar10\\Test_cntk_text.txt"])
     label_dataset = label_lines_dataset.map(text_to_one_hot)
+    index_dataset = label_lines_dataset.map(text_to_index)
 
-    dataset = tf.data.Dataset.zip((image_dataset, label_dataset))
+    dataset = tf.data.Dataset.zip((image_dataset, label_dataset, index_dataset))
 
     dataset = dataset.batch(batch_size)
     dataset = dataset.repeat()
@@ -46,7 +47,7 @@ initializer = tf.truncated_normal_initializer(stddev=0.02)
 
 
 def generator(z):
-    fcW1 = tf.get_variable('fcW1', [25, 1024], initializer=initializer)
+    fcW1 = tf.get_variable('fcW1', [100, 1024], initializer=initializer)
     fcb1 = tf.get_variable('fcb1', [1024], initializer=tf.constant_initializer(0.0))
     
     f1 = tf.nn.sigmoid(tf.matmul(z, fcW1) + fcb1)
@@ -66,7 +67,7 @@ def generator(z):
     conv1 = tf.layers.batch_normalization(conv1, fused=True)
 
     W_conv2 = tf.get_variable('W_conv2', [5, 5, 32, 64], initializer=initializer)
-    b_conv2 = tf.get_variable('b_conv2', [16, 16, 1], initializer=tf.constant_initializer(0.0))
+    b_conv2 = tf.get_variable('b_conv2', [16, 16, 32], initializer=tf.constant_initializer(0.0))
 
     conv2 = tf.nn.sigmoid(tf.nn.conv2d_transpose(conv1, W_conv2, [100, 16, 16, 32], [1, 2, 2, 1]) + b_conv2)
     conv2 = tf.layers.batch_normalization(conv2, fused=True)
@@ -114,12 +115,13 @@ def discriminator(x):
     return f2
 
 with tf.variable_scope('G'):
-    z = tf.random_uniform([100, 25])
+    z = tf.random_uniform([100, 100])
     G = generator(z)
 
 images_and_labels = load_images_and_labels(100).get_next()
 x = images_and_labels[0]
 yx = images_and_labels[1]
+x_indices = images_and_labels[2]
 yg = tf.reshape(tf.tile(tf.one_hot(10, 11), [100]), [100, 11])
 
 with tf.variable_scope('D'):
@@ -132,8 +134,11 @@ loss_d = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=yx, logit
 # loss_g = -tf.reduce_mean(tf.log(Dg)) #This optimizes the generator.
 loss_g = -tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=yg, logits=Dg)) #This optimizes the generator.
 
-correct_prediction = tf.equal(tf.argmax(Dg, 1), tf.argmax(yg, 1))
-accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+real_correct_prediction = tf.equal(tf.argmax(Dx, 1), tf.argmax(yx, 1))
+real_accuracy = tf.reduce_mean(tf.cast(real_correct_prediction, tf.float32))
+
+generated_correct_prediction = tf.equal(tf.argmax(Dg, 1), tf.argmax(yg, 1))
+generated_accuracy = tf.reduce_mean(tf.cast(generated_correct_prediction, tf.float32))
 
 vars = tf.trainable_variables()
 for v in vars:
@@ -151,28 +156,30 @@ with tf.Session() as session:
     start_time = time.time()
     previous_step_time = time.time()
     sample_directory = 'generated_images/cifar/{}'.format(start_time)
-    for step in range(1000000):
+    for step in range(1, 200001):
         # update discriminator
         loss_d_thingy, _ = session.run([loss_d, d_opt])
 
         # update generator
-        for i in range(15):
+        for i in range(30):
             loss_g_thingy, _ = session.run([loss_g, g_opt])
 
         if step % 100 == 0:
-            train_accuracy = session.run([accuracy])
+            real_train_accuracy, generated_train_accuracy = session.run([real_accuracy, generated_accuracy])
             print('{}: discriminator loss {:.8f}\tgenerator loss {:.8f}'.format(step, loss_d_thingy, loss_g_thingy))
-            print('train accuracy: {}'.format(train_accuracy))
-
-        if step % 100 == 0:
-            gen_image = session.run(G)
-            real_image = session.run(x)
-            if not os.path.exists(sample_directory):
-                os.makedirs(sample_directory)
-            save_images.save_images(np.reshape(gen_image, [100, 32, 32, 3]), [10, 10], sample_directory + '/{}gen.png'.format(step))
-            save_images.save_images(np.reshape(real_image, [100, 32, 32, 3]), [10, 10], sample_directory + '/{}real.png'.format(step))
+            print('label accuracy: {}'.format(real_train_accuracy))
+            print('real/fake accurary: {}'.format(generated_train_accuracy))
 
         if step % 100 == 0:
             current_step_time = time.time()
             print('{}: previous 100 steps took {:.4f}s'.format(step, current_step_time - previous_step_time))
             previous_step_time = current_step_time
+
+        if step % 1000 == 0:
+            gen_image = session.run(G)
+            real_image, real_labels = session.run([x, x_indices])
+            if not os.path.exists(sample_directory):
+                os.makedirs(sample_directory)
+            save_images.save_images(np.reshape(gen_image, [100, 32, 32, 3]), [10, 10], sample_directory + '/{}gen.png'.format(step))
+            save_images.save_images(np.reshape(real_image, [100, 32, 32, 3]), [10, 10], sample_directory + '/{}real.png'.format(step))
+            print('Real image labels:\n{}'.format([cifar_categories[rl] for rl in real_labels]))
