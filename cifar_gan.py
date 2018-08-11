@@ -149,6 +149,9 @@ g_params = [v for v in vars if v.name.startswith('G/')]
 d_opt = tf.train.AdamOptimizer(1e-4).minimize(loss_d, var_list=d_params)
 g_opt = tf.train.AdamOptimizer(1e-4).minimize(loss_g, var_list=g_params)
 
+d_saver = tf.train.Saver(d_params)
+g_saver = tf.train.Saver(g_params)
+
 with tf.Session() as session:
     tf.local_variables_initializer().run()
     tf.global_variables_initializer().run()
@@ -189,3 +192,7 @@ with tf.Session() as session:
             save_images.save_images(np.reshape(gen_image, [100, 32, 32, 3]), [10, 10], sample_directory + '/{}gen.png'.format(step))
             save_images.save_images(np.reshape(real_image, [100, 32, 32, 3]), [10, 10], sample_directory + '/{}real.png'.format(step))
             print('Real image labels:\n{}'.format([cifar_categories[rl] for rl in real_labels]))
+
+        if step % 1000 == 0:
+            d_saver.save(session, sample_directory + '/discriminator.model', global_step=step)
+            g_saver.save(session, sample_directory + '/generator.model', global_step=step)
