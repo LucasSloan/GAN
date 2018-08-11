@@ -4,6 +4,7 @@ import numpy as np
 import time
 
 import os
+import sys
 
 import save_images
 import custom_layers
@@ -155,6 +156,24 @@ g_saver = tf.train.Saver(g_params)
 with tf.Session() as session:
     tf.local_variables_initializer().run()
     tf.global_variables_initializer().run()
+
+    if len(sys.argv) > 1:
+        checkpoint_dir = sys.argv[1]
+        print('attempting to load checkpoint from {}'.format(checkpoint_dir))
+        
+        d_checkpoint_dir = checkpoint_dir + "/disciminator_checkpoints"
+        d_checkpoint = tf.train.get_checkpoint_state(d_checkpoint_dir)
+        if d_checkpoint and d_checkpoint.model_checkpoint_path:
+            d_saver.restore(session, d_checkpoint.model_checkpoint_path)
+            print(d_checkpoint)
+
+        g_checkpoint_dir = checkpoint_dir + "/generator_checkpoints"
+        g_checkpoint = tf.train.get_checkpoint_state(g_checkpoint_dir)
+        if g_checkpoint and g_checkpoint.model_checkpoint_path:
+            g_saver.restore(session, g_checkpoint.model_checkpoint_path)
+            print(g_checkpoint)
+    else:
+        print('no checkpoint specified, starting training from scratch')
 
     start_time = time.time()
     previous_step_time = time.time()
