@@ -125,37 +125,40 @@ for v in vars:
 d_params = [v for v in vars if v.name.startswith('D/')]
 g_params = [v for v in vars if v.name.startswith('G/')]
 
-d_opt = tf.train.AdamOptimizer(1e-4).minimize(loss_d, var_list=d_params)
-g_opt = tf.train.AdamOptimizer(1e-4).minimize(loss_g, var_list=g_params)
+d_opt = tf.train.AdamOptimizer(1e-5).minimize(loss_d, var_list=d_params)
+g_opt = tf.train.AdamOptimizer(1e-5).minimize(loss_g, var_list=g_params)
 
+for generator_ratio in range(1, 43, 3):
+    print("\n\ntesting convergence with generator ratio: {}".format(generator_ratio))
+    for h in range(2):
+        print("\n trail {} of 5".format(h))
+        with tf.Session() as session:
+            tf.local_variables_initializer().run()
+            tf.global_variables_initializer().run()
 
-with tf.Session() as session:
-    tf.local_variables_initializer().run()
-    tf.global_variables_initializer().run()
+            start_time = time.time()
+            previous_step_time = time.time()
+            sample_directory = 'generated_images/lsun/{}'.format(start_time)
+            for step in range(1, 3001):
+                # update discriminator
+                loss_d_thingy, _ = session.run([loss_d, d_opt])
 
-    start_time = time.time()
-    previous_step_time = time.time()
-    sample_directory = 'generated_images/lsun/{}'.format(start_time)
-    for step in range(1000000):
-        # update discriminator
-        loss_d_thingy, _ = session.run([loss_d, d_opt])
+                # update generator
+                for i in range(generator_ratio):
+                    loss_g_thingy, _ = session.run([loss_g, g_opt])
 
-        # update generator
-        for i in range(5):
-            loss_g_thingy, _ = session.run([loss_g, g_opt])
+                if step % 500 == 0:
+                    print('{}: discriminator loss {:.8f}\tgenerator loss {:.8f}'.format(step, loss_d_thingy, loss_g_thingy))
 
-        if step % 100 == 0:
-            print('{}: discriminator loss {:.8f}\tgenerator loss {:.8f}'.format(step, loss_d_thingy, loss_g_thingy))
-
-        if step % 100 == 0:
-            current_step_time = time.time()
-            print('{}: previous 100 steps took {:.4f}s'.format(step, current_step_time - previous_step_time))
-            previous_step_time = current_step_time
-            
-        if step % 1000 == 0:
-            gen_image = session.run(G)
-            real_image = session.run(x)
-            if not os.path.exists(sample_directory):
-                os.makedirs(sample_directory)
-            save_images.save_images(np.reshape(gen_image, [100, 64, 64, 3]), [10, 10], sample_directory + '/{}gen.png'.format(step))
-            save_images.save_images(np.reshape(real_image, [100, 64, 64, 3]), [10, 10], sample_directory + '/{}real.png'.format(step))
+                # if step % 100 == 0:
+                #     current_step_time = time.time()
+                #     print('{}: previous 100 steps took {:.4f}s'.format(step, current_step_time - previous_step_time))
+                #     previous_step_time = current_step_time
+                    
+                # if step % 1000 == 0:
+                #     gen_image = session.run(G)
+                #     real_image = session.run(x)
+                #     if not os.path.exists(sample_directory):
+                #         os.makedirs(sample_directory)
+                #     save_images.save_images(np.reshape(gen_image, [100, 64, 64, 3]), [10, 10], sample_directory + '/{}gen.png'.format(step))
+                #     save_images.save_images(np.reshape(real_image, [100, 64, 64, 3]), [10, 10], sample_directory + '/{}real.png'.format(step))
