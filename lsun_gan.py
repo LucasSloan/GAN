@@ -48,7 +48,7 @@ def generator(z):
     conv1 = tf.layers.batch_normalization(conv1, fused=True)
 
     W_conv2 = tf.get_variable('W_conv2', [5, 5, 32, 64], initializer=initializer)
-    b_conv2 = tf.get_variable('b_conv2', [32, 32, 1], initializer=tf.constant_initializer(0.0))
+    b_conv2 = tf.get_variable('b_conv2', [32, 32, 32], initializer=tf.constant_initializer(0.0))
 
     conv2 = tf.nn.sigmoid(tf.nn.conv2d_transpose(conv1, W_conv2, [100, 32, 32, 32], [1, 2, 2, 1]) + b_conv2)
     conv2 = tf.layers.batch_normalization(conv2, fused=True)
