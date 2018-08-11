@@ -194,5 +194,12 @@ with tf.Session() as session:
             print('Real image labels:\n{}'.format([cifar_categories[rl] for rl in real_labels]))
 
         if step % 1000 == 0:
-            d_saver.save(session, sample_directory + '/discriminator.model', global_step=step)
-            g_saver.save(session, sample_directory + '/generator.model', global_step=step)
+            d_checkpoint_dir = sample_directory + "/disciminator_checkpoints"
+            if not os.path.exists(d_checkpoint_dir):
+                os.makedirs(d_checkpoint_dir)
+            d_saver.save(session, d_checkpoint_dir + '/discriminator.model', global_step=step)
+
+            g_checkpoint_dir = sample_directory + "/generator_checkpoints"
+            if not os.path.exists(g_checkpoint_dir):
+                os.makedirs(g_checkpoint_dir)
+            g_saver.save(session, g_checkpoint_dir + '/generator.model', global_step=step)
