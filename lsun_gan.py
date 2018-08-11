@@ -10,16 +10,17 @@ def parse_images(filename):
   image_string = tf.read_file(filename)
   image_decoded = tf.image.decode_jpeg(image_string, channels=3)
   image_normalized = 2.0 * tf.image.convert_image_dtype(image_decoded, tf.float32) - 1.0
-  image_resized = tf.image.resize_images(image_normalized, [64, 64])
-  image_flipped = tf.image.flip_left_right(image_resized)
+#   image_resized = tf.image.resize_images(image_normalized, [64, 64])
+  image_flipped = tf.image.flip_left_right(image_normalized)
   return image_flipped
 
 def load_images(batch_size):
-    image_files_dataset = tf.data.Dataset.list_files("E:\\LSUN\\train\\*")
+    image_files_dataset = tf.data.Dataset.list_files("E:\\LSUN\\train64x64\\*")
     image_dataset = image_files_dataset.map(parse_images, num_parallel_calls=8)
 
     dataset = image_dataset.apply(tf.contrib.data.batch_and_drop_remainder(batch_size))
-    dataset = dataset.apply(tf.contrib.data.shuffle_and_repeat(5000))
+    dataset = dataset.repeat()
+    # dataset = dataset.apply(tf.contrib.data.shuffle_and_repeat(10000))
     dataset = dataset.prefetch(batch_size)
     return dataset.make_one_shot_iterator()
 
