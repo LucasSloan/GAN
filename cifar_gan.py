@@ -156,17 +156,23 @@ with tf.Session() as session:
     start_time = time.time()
     previous_step_time = time.time()
     sample_directory = 'generated_images/cifar/{}'.format(start_time)
+    d_epoch_losses = []
+    g_epoch_losses = []
     for step in range(1, 200001):
         # update discriminator
-        loss_d_thingy, _ = session.run([loss_d, d_opt])
+        d_batch_loss, _ = session.run([loss_d, d_opt])
+        d_epoch_losses.append(d_batch_loss)
 
         # update generator
-        for i in range(30):
-            loss_g_thingy, _ = session.run([loss_g, g_opt])
+        for i in range(1):
+            g_batch_loss, _ = session.run([loss_g, g_opt])
+            g_epoch_losses.append(g_batch_loss)
 
         if step % 100 == 0:
             real_train_accuracy, generated_train_accuracy = session.run([real_accuracy, generated_accuracy])
-            print('{}: discriminator loss {:.8f}\tgenerator loss {:.8f}'.format(step, loss_d_thingy, loss_g_thingy))
+            print('{}: discriminator loss {:.8f}\tgenerator loss {:.8f}'.format(step, np.mean(d_epoch_losses), np.mean(g_epoch_losses)))
+            d_epoch_losses = []
+            g_epoch_losses = []
             print('label accuracy: {}'.format(real_train_accuracy))
             print('real/fake accurary: {}'.format(generated_train_accuracy))
 
