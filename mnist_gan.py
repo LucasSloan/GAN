@@ -7,8 +7,24 @@ import os
 import save_images
 import custom_layers
 
-from tensorflow.examples.tutorials.mnist import input_data
-mnist = input_data.read_data_sets("../tensorflow_learning/MNIST/MNIST_data/", one_hot=True)
+def parse_images(filename):
+  image_string = tf.read_file(filename)
+  image_decoded = tf.image.decode_png(image_string)
+  image_resized = tf.image.resize_image_with_crop_or_pad(image_decoded, 32, 32)
+  image_normalized = 2.0 * tf.image.convert_image_dtype(image_resized, tf.float32) - 1.0
+  return image_normalized
+
+def load_images(batch_size):
+    image_files_dataset = tf.data.Dataset.list_files("E:\\mnist\\train\\*\\*")
+    image_files_dataset = image_files_dataset.concatenate(tf.data.Dataset.list_files("E:\\mnist\\test\\*\\*"))
+    image_dataset = image_files_dataset.map(parse_images, num_parallel_calls=8)
+
+    dataset = image_dataset.batch(batch_size)
+    dataset = dataset.repeat()
+    # dataset = dataset.apply(tf.contrib.data.shuffle_and_repeat(10000))
+    dataset = dataset.prefetch(batch_size)
+    return dataset.make_one_shot_iterator()
+
 
 initializer = tf.truncated_normal_initializer(stddev=0.02)
 
@@ -67,10 +83,10 @@ def discriminator(x):
     return f2
 
 with tf.variable_scope('G'):
-    z = tf.placeholder(tf.float32, [100, 25])
+    z = tf.random_uniform([100, 25])
     G = generator(z)
 
-x = tf.placeholder(tf.float32, [None, 32, 32, 1])
+x = load_images(100).get_next()
 with tf.variable_scope('D'):
     Dx = discriminator(x)
 with tf.variable_scope('D', reuse=True):
@@ -103,26 +119,29 @@ with tf.Session() as session:
     tf.local_variables_initializer().run()
     tf.global_variables_initializer().run()
 
+    previous_step_time = time.time()
     start_time = time.time()
     sample_directory = 'generated_images/mnist/{}'.format(start_time)
-    for step in range(100000):
+    for step in range(1, 100001):
         # update discriminator
-        mnist_images, _ = mnist.train.next_batch(100)
-        mnist_images = (np.reshape(mnist_images, [100, 28, 28, 1]) - 0.5) * 2.0
-        mnist_images = np.lib.pad(mnist_images, ((0,0),(2,2),(2,2),(0,0)),'constant', constant_values=(-1, -1))
-        input_noise = np.random.rand(100, 25)
-        loss_d_thingy, _, dx, dg = session.run([loss_d, d_opt, Dx, Dg], {x: mnist_images, z: input_noise})
+        for _ in range(1):
+            loss_d_thingy, _ = session.run([loss_d, d_opt])
 
         # update generator
-        input_noise = np.random.rand(100, 25)
-        loss_g_thingy, _ = session.run([loss_g, g_opt], {z: input_noise})
+        loss_g_thingy, _ = session.run([loss_g, g_opt])
 
         if step % 100 == 0:
             print('{}: discriminator loss {:.8f}\tgenerator loss {:.8f}'.format(step, loss_d_thingy, loss_g_thingy))
 
         if step % 100 == 0:
-            input_noise = np.random.rand(100, 25)
-            image = session.run(G, {z: input_noise})
+            current_step_time = time.time()
+            print('{}: previous 100 steps took {:.4f}s'.format(step, current_step_time - previous_step_time))
+            previous_step_time = current_step_time
+
+        if step % 1000 == 0:
+            gen_image = session.run(G)
+            real_image = session.run(x)
             if not os.path.exists(sample_directory):
                 os.makedirs(sample_directory)
-            save_images.save_images(np.reshape(image, [100, 32, 32, 1]), [10, 10], sample_directory + '/fig{}.png'.format(step))
+            save_images.save_images(np.reshape(gen_image, [100, 32, 32, 1]), [10, 10], sample_directory + '/{}gen.png'.format(step))
+            save_images.save_images(np.reshape(real_image, [100, 32, 32, 1]), [10, 10], sample_directory + '/{}real.png'.format(step))
