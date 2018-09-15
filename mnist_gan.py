@@ -49,14 +49,14 @@ def generator(z, training):
     return conv2
 
 def discriminator(x, training):
-    h_conv1 = tf.nn.leaky_relu(ops.conv2d(x, 32, 5, 5, 2, 2, name="h_conv1"))
+    h_conv1 = tf.nn.leaky_relu(ops.conv2d(x, 32, 5, 5, 2, 2, name="h_conv1", use_sn=True))
 
-    h_conv2 = tf.nn.leaky_relu(ops.conv2d(h_conv1, 64, 5, 5, 2, 2, name="h_conv2"))
+    h_conv2 = tf.nn.leaky_relu(ops.conv2d(h_conv1, 64, 5, 5, 2, 2, name="h_conv2", use_sn=True))
     h_conv2_flat = tf.reshape(h_conv2, [-1, 8*8*64])
 
-    f1 = tf.nn.leaky_relu(ops.linear(h_conv2_flat, 1024, scope="f1"))
+    f1 = tf.nn.leaky_relu(ops.linear(h_conv2_flat, 1024, scope="f1", use_sn=True))
 
-    f2 = tf.nn.sigmoid(ops.linear(f1, 1, scope="f2"))
+    f2 = tf.nn.sigmoid(ops.linear(f1, 1, scope="f2", use_sn=True))
 
     return f2
 
@@ -95,7 +95,7 @@ with tf.Session() as session:
     sample_directory = 'generated_images/mnist/{}'.format(start_time)
     for step in range(1, 100001):
         # update discriminator
-        for _ in range(2):
+        for _ in range(5):
             loss_d_thingy, _ = session.run([loss_d, d_opt], {training: True})
 
         # update generator
