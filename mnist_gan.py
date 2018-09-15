@@ -20,6 +20,7 @@ def load_images(batch_size):
     image_dataset = image_files_dataset.map(parse_images, num_parallel_calls=8)
 
     dataset = image_dataset.batch(batch_size)
+    dataset = dataset.cache()
     dataset = dataset.repeat()
     # dataset = dataset.apply(tf.contrib.data.shuffle_and_repeat(10000))
     dataset = dataset.prefetch(batch_size)
