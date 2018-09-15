@@ -54,9 +54,9 @@ def discriminator(x, training):
     h_conv2 = tf.nn.leaky_relu(ops.conv2d(h_conv1, 64, 5, 5, 2, 2, name="h_conv2"))
     h_conv2_flat = tf.reshape(h_conv2, [-1, 8*8*64])
 
-    f1 = tf.layers.dense(h_conv2_flat, 1024, tf.nn.leaky_relu)
+    f1 = tf.nn.leaky_relu(ops.linear(h_conv2_flat, 1024, scope="f1"))
 
-    f2 = tf.layers.dense(f1, 1, tf.nn.sigmoid)
+    f2 = tf.nn.sigmoid(ops.linear(f1, 1, scope="f2"))
 
     return f2
 
