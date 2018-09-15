@@ -6,6 +6,9 @@ import time
 import os
 import save_images
 import custom_layers
+import ops
+
+BATCH_SIZE = 100
 
 def parse_images(filename):
   image_string = tf.read_file(filename)
@@ -46,15 +49,12 @@ def generator(z, training):
     return conv2
 
 def discriminator(x, training):
-    h_conv1 = tf.layers.conv2d(x, 32, [5, 5], strides=(2, 2), padding='same', activation=tf.nn.leaky_relu)
-    # h_conv1 = tf.layers.batch_normalization(h_conv1, training=training)
+    h_conv1 = tf.nn.leaky_relu(ops.conv2d(x, 32, 5, 5, 2, 2, name="h_conv1"))
 
-    h_conv2 = tf.layers.conv2d(h_conv1, 64, [5, 5], strides=(2, 2), padding='same', activation=tf.nn.leaky_relu)
+    h_conv2 = tf.nn.leaky_relu(ops.conv2d(h_conv1, 64, 5, 5, 2, 2, name="h_conv2"))
     h_conv2_flat = tf.reshape(h_conv2, [-1, 8*8*64])
-    # h_conv2_flat = tf.layers.batch_normalization(h_conv2_flat, training=training)
 
     f1 = tf.layers.dense(h_conv2_flat, 1024, tf.nn.leaky_relu)
-    # f1 = tf.layers.batch_normalization(f1, training=training)
 
     f2 = tf.layers.dense(f1, 1, tf.nn.sigmoid)
 
@@ -63,10 +63,11 @@ def discriminator(x, training):
 training = tf.placeholder(tf.bool)
 
 with tf.variable_scope('G'):
-    z = tf.random_uniform([100, 100])
+    z = tf.random_uniform([BATCH_SIZE, 100])
     G = generator(z, training)
 
-x = load_images(100).get_next()
+x = load_images(BATCH_SIZE).get_next()
+x.set_shape([100, 32, 32, 1])
 with tf.variable_scope('D'):
     Dx = discriminator(x, training)
 with tf.variable_scope('D', reuse=True):
@@ -94,7 +95,7 @@ with tf.Session() as session:
     sample_directory = 'generated_images/mnist/{}'.format(start_time)
     for step in range(1, 100001):
         # update discriminator
-        for _ in range(1):
+        for _ in range(2):
             loss_d_thingy, _ = session.run([loss_d, d_opt], {training: True})
 
         # update generator
@@ -114,5 +115,5 @@ with tf.Session() as session:
             real_image = session.run(x, {training: True})
             if not os.path.exists(sample_directory):
                 os.makedirs(sample_directory)
-            save_images.save_images(np.reshape(gen_image, [100, 32, 32, 1]), [10, 10], sample_directory + '/{}gen.png'.format(step))
-            save_images.save_images(np.reshape(real_image, [100, 32, 32, 1]), [10, 10], sample_directory + '/{}real.png'.format(step))
+            save_images.save_images(np.reshape(gen_image, [BATCH_SIZE, 32, 32, 1]), [10, 10], sample_directory + '/{}gen.png'.format(step))
+            save_images.save_images(np.reshape(real_image, [BATCH_SIZE, 32, 32, 1]), [10, 10], sample_directory + '/{}real.png'.format(step))
