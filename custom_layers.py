@@ -50,3 +50,12 @@ def spectral_norm(w, u, iteration=1):
         w_norm = tf.reshape(w_norm, w_shape)
 
     return w_norm
+
+def log(x):
+    """
+    Sometimes the discriminator outputs can reach values close to
+    (or even slightly less than) zero due to numerical rounding.
+    This just makes sure that we exclude those values so that we don't
+    end up with NaNs during optimization.
+    """
+    return tf.log(tf.maximum(x, 1e-5))
