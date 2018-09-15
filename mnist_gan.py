@@ -110,8 +110,8 @@ with tf.Session() as session:
             previous_step_time = current_step_time
 
         if step % 1000 == 0:
-            gen_image = session.run(G, {training: False})
-            real_image = session.run(x, {training: False})
+            gen_image = session.run(G, {training: True})
+            real_image = session.run(x, {training: True})
             if not os.path.exists(sample_directory):
                 os.makedirs(sample_directory)
             save_images.save_images(np.reshape(gen_image, [100, 32, 32, 1]), [10, 10], sample_directory + '/{}gen.png'.format(step))
