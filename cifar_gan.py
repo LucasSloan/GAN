@@ -8,12 +8,13 @@ import sys
 
 import save_images
 import custom_layers
+import ops
 
 cifar_categories = ["airplane", "automobile", "bird", "cat", "deer", "dog", "frog", "horse", "ship", "truck"]
 
 def parse_images(filename):
   image_string = tf.read_file(filename)
-  image_decoded = tf.image.decode_png(image_string)
+  image_decoded = tf.image.decode_png(image_string, channels=3)
   image_flipped = tf.image.random_flip_left_right(image_decoded)
   image_normalized = 2.0 * tf.image.convert_image_dtype(image_flipped, tf.float32) - 1.0
   return image_normalized
@@ -47,71 +48,98 @@ def load_images_and_labels(batch_size):
 initializer = tf.truncated_normal_initializer(stddev=0.02)
 
 
-def generator(z):
-    fcW1 = tf.get_variable('fcW1', [100, 1024], initializer=initializer)
-    fcb1 = tf.get_variable('fcb1', [1024], initializer=tf.constant_initializer(0.0))
+# def generator(z):
+#     fcW1 = tf.get_variable('fcW1', [100, 1024], initializer=initializer)
+#     fcb1 = tf.get_variable('fcb1', [1024], initializer=tf.constant_initializer(0.0))
     
-    f1 = tf.nn.sigmoid(tf.matmul(z, fcW1) + fcb1)
-    f1 = tf.layers.batch_normalization(f1, fused=True)
+#     f1 = tf.nn.sigmoid(tf.matmul(z, fcW1) + fcb1)
+#     f1 = tf.layers.batch_normalization(f1, fused=True)
 
-    W2 = tf.get_variable('W2', [1024, 4 * 4 * 128], initializer=initializer)
-    b2 = tf.get_variable('b2', [4 * 4 * 128], initializer=tf.constant_initializer(0.0))
+#     W2 = tf.get_variable('W2', [1024, 4 * 4 * 128], initializer=initializer)
+#     b2 = tf.get_variable('b2', [4 * 4 * 128], initializer=tf.constant_initializer(0.0))
 
-    f2 = tf.nn.sigmoid(tf.matmul(f1, W2) + b2)
-    f2 = tf.layers.batch_normalization(f2, fused=True)
-    f2 = tf.reshape(f2, [-1, 4, 4, 128])
+#     f2 = tf.nn.sigmoid(tf.matmul(f1, W2) + b2)
+#     f2 = tf.layers.batch_normalization(f2, fused=True)
+#     f2 = tf.reshape(f2, [-1, 4, 4, 128])
 
-    W_conv1 = tf.get_variable('W_conv1', [5, 5, 64, 128], initializer=initializer)
-    b_conv1 = tf.get_variable('b_conv1', [8, 8, 64], initializer=tf.constant_initializer(0.0))
+#     W_conv1 = tf.get_variable('W_conv1', [5, 5, 64, 128], initializer=initializer)
+#     b_conv1 = tf.get_variable('b_conv1', [8, 8, 64], initializer=tf.constant_initializer(0.0))
 
-    conv1 = tf.nn.sigmoid(tf.nn.conv2d_transpose(f2, W_conv1, [100, 8, 8, 64], [1, 2, 2, 1]) + b_conv1)
-    conv1 = tf.layers.batch_normalization(conv1, fused=True)
+#     conv1 = tf.nn.sigmoid(tf.nn.conv2d_transpose(f2, W_conv1, [100, 8, 8, 64], [1, 2, 2, 1]) + b_conv1)
+#     conv1 = tf.layers.batch_normalization(conv1, fused=True)
 
-    W_conv2 = tf.get_variable('W_conv2', [5, 5, 32, 64], initializer=initializer)
-    b_conv2 = tf.get_variable('b_conv2', [16, 16, 32], initializer=tf.constant_initializer(0.0))
+#     W_conv2 = tf.get_variable('W_conv2', [5, 5, 32, 64], initializer=initializer)
+#     b_conv2 = tf.get_variable('b_conv2', [16, 16, 32], initializer=tf.constant_initializer(0.0))
 
-    conv2 = tf.nn.sigmoid(tf.nn.conv2d_transpose(conv1, W_conv2, [100, 16, 16, 32], [1, 2, 2, 1]) + b_conv2)
-    conv2 = tf.layers.batch_normalization(conv2, fused=True)
+#     conv2 = tf.nn.sigmoid(tf.nn.conv2d_transpose(conv1, W_conv2, [100, 16, 16, 32], [1, 2, 2, 1]) + b_conv2)
+#     conv2 = tf.layers.batch_normalization(conv2, fused=True)
 
-    W_conv3 = tf.get_variable('W_conv3', [5, 5, 3, 32], initializer=initializer)
-    b_conv3 = tf.get_variable('b_conv3', [32, 32, 3], initializer=tf.constant_initializer(0.0))
+#     W_conv3 = tf.get_variable('W_conv3', [5, 5, 3, 32], initializer=initializer)
+#     b_conv3 = tf.get_variable('b_conv3', [32, 32, 3], initializer=tf.constant_initializer(0.0))
 
-    conv3 = tf.nn.tanh(tf.nn.conv2d_transpose(conv2, W_conv3, [100, 32, 32, 3], [1, 2, 2, 1]) + b_conv3)
+#     conv3 = tf.nn.tanh(tf.nn.conv2d_transpose(conv2, W_conv3, [100, 32, 32, 3], [1, 2, 2, 1]) + b_conv3)
 
-    return conv3
+#     return conv3
+
+# def discriminator(x):
+#     W_conv1 = tf.get_variable('W_conv1', [5, 5, 3, 32], initializer=initializer)
+#     b_conv1 = tf.get_variable('b_conv1', [32], initializer=tf.constant_initializer(0.0))
+
+#     h_conv1 = custom_layers.lrelu(tf.nn.conv2d(x, W_conv1, strides=[1, 1, 1, 1], padding='SAME') + b_conv1)
+#     h_pool1 = tf.nn.max_pool(h_conv1, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+
+#     W_conv2 = tf.get_variable('W_conv2', [5, 5, 32, 64], initializer=initializer)
+#     b_conv2 = tf.get_variable('b_conv2', [64], initializer=tf.constant_initializer(0.0))
+
+#     h_conv2 = custom_layers.lrelu(tf.nn.conv2d(h_pool1, W_conv2, strides=[1, 1, 1, 1], padding='SAME') + b_conv2)
+#     h_pool2 = tf.nn.max_pool(h_conv2, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+
+#     W_conv3 = tf.get_variable('W_conv3', [5, 5, 64, 128], initializer=initializer)
+#     b_conv3 = tf.get_variable('b_conv3', [128], initializer=tf.constant_initializer(0.0))
+
+#     h_conv3 = custom_layers.lrelu(tf.nn.conv2d(h_pool2, W_conv3, strides=[1, 1, 1, 1], padding='SAME') + b_conv3)
+#     h_pool3 = tf.nn.max_pool(h_conv3, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+
+#     h_pool3_flat = tf.reshape(h_pool3, [-1, 4*4*128])
+
+#     minibatch = custom_layers.minibatch_layer(h_pool3_flat, initializer, 100, 5)
+
+#     # W1 = tf.get_variable('W1', [4*4*128 + 10, 2048], initializer=initializer)
+#     # b1 = tf.get_variable('b1', [2048], initializer=tf.constant_initializer(0.0))
+    
+#     # f1 = lrelu(tf.matmul(minibatch, W1) + b1)
+
+#     W2 = tf.get_variable('W2', [4*4*128 + 100, 11], initializer=initializer)
+#     b2 = tf.get_variable('b2', [11], initializer=tf.constant_initializer(0.0))
+
+#     f2 = tf.matmul(minibatch, W2) + b2
+
+#     return f2
+
+def generator(z):
+    f1 = tf.layers.dense(z, 1024, tf.nn.leaky_relu)
+    f1 = tf.layers.batch_normalization(f1)
+
+    f2 = tf.layers.dense(f1, 8 * 8 * 64, tf.nn.leaky_relu)
+    f2 = tf.reshape(f2, [-1, 8, 8, 64])
+    f2 = tf.layers.batch_normalization(f2)
+
+    conv1 = tf.layers.conv2d_transpose(f2, 32, [5, 5], strides=(2, 2), padding="same", activation=tf.nn.leaky_relu)
+    conv1 = tf.layers.batch_normalization(conv1)
+
+    conv2 = tf.layers.conv2d_transpose(conv1, 3, [5, 5], strides=(2, 2), padding="same", activation=tf.nn.tanh)
+
+    return conv2
 
 def discriminator(x):
-    W_conv1 = tf.get_variable('W_conv1', [5, 5, 3, 32], initializer=initializer)
-    b_conv1 = tf.get_variable('b_conv1', [32], initializer=tf.constant_initializer(0.0))
+    h_conv1 = tf.nn.leaky_relu(ops.conv2d(x, 32, 5, 5, 2, 2, name="h_conv1", use_sn=True))
 
-    h_conv1 = custom_layers.lrelu(tf.nn.conv2d(x, W_conv1, strides=[1, 1, 1, 1], padding='SAME') + b_conv1)
-    h_pool1 = tf.nn.max_pool(h_conv1, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+    h_conv2 = tf.nn.leaky_relu(ops.conv2d(h_conv1, 64, 5, 5, 2, 2, name="h_conv2", use_sn=True))
+    h_conv2_flat = tf.reshape(h_conv2, [-1, 8*8*64])
 
-    W_conv2 = tf.get_variable('W_conv2', [5, 5, 32, 64], initializer=initializer)
-    b_conv2 = tf.get_variable('b_conv2', [64], initializer=tf.constant_initializer(0.0))
+    f1 = tf.nn.leaky_relu(ops.linear(h_conv2_flat, 1024, scope="f1", use_sn=True))
 
-    h_conv2 = custom_layers.lrelu(tf.nn.conv2d(h_pool1, W_conv2, strides=[1, 1, 1, 1], padding='SAME') + b_conv2)
-    h_pool2 = tf.nn.max_pool(h_conv2, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
-
-    W_conv3 = tf.get_variable('W_conv3', [5, 5, 64, 128], initializer=initializer)
-    b_conv3 = tf.get_variable('b_conv3', [128], initializer=tf.constant_initializer(0.0))
-
-    h_conv3 = custom_layers.lrelu(tf.nn.conv2d(h_pool2, W_conv3, strides=[1, 1, 1, 1], padding='SAME') + b_conv3)
-    h_pool3 = tf.nn.max_pool(h_conv3, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
-
-    h_pool3_flat = tf.reshape(h_pool3, [-1, 4*4*128])
-
-    minibatch = custom_layers.minibatch_layer(h_pool3_flat, initializer, 100, 5)
-
-    # W1 = tf.get_variable('W1', [4*4*128 + 10, 2048], initializer=initializer)
-    # b1 = tf.get_variable('b1', [2048], initializer=tf.constant_initializer(0.0))
-    
-    # f1 = lrelu(tf.matmul(minibatch, W1) + b1)
-
-    W2 = tf.get_variable('W2', [4*4*128 + 100, 11], initializer=initializer)
-    b2 = tf.get_variable('b2', [11], initializer=tf.constant_initializer(0.0))
-
-    f2 = tf.matmul(minibatch, W2) + b2
+    f2 = tf.nn.sigmoid(ops.linear(f1, 1, scope="f2", use_sn=True))
 
     return f2
 
@@ -121,6 +149,7 @@ with tf.variable_scope('G'):
 
 images_and_labels = load_images_and_labels(100).get_next()
 x = images_and_labels[0]
+x.set_shape([100, 32, 32, 3])
 yx = images_and_labels[1]
 x_indices = images_and_labels[2]
 yg = tf.reshape(tf.tile(tf.one_hot(10, 11), [100]), [100, 11])
@@ -130,16 +159,16 @@ with tf.variable_scope('D'):
 with tf.variable_scope('D', reuse=True):
     Dg = discriminator(G)
 
-# loss_d = -tf.reduce_mean(tf.log(Dx) + tf.log(1.-Dg)) #This optimizes the discriminator.
-loss_d = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=yx, logits=Dx) + tf.nn.softmax_cross_entropy_with_logits(labels=yg, logits=Dg)) #This optimizes the discriminator.
-# loss_g = -tf.reduce_mean(tf.log(Dg)) #This optimizes the generator.
-loss_g = -tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=yg, logits=Dg)) #This optimizes the generator.
+loss_d = -tf.reduce_mean(tf.log(Dx) + tf.log(1.-Dg)) #This optimizes the discriminator.
+loss_g = -tf.reduce_mean(tf.log(Dg)) #This optimizes the generator.
+# loss_d = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=yx, logits=Dx) + tf.nn.softmax_cross_entropy_with_logits(labels=yg, logits=Dg)) #This optimizes the discriminator.
+# loss_g = -tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=yg, logits=Dg)) #This optimizes the generator.
 
-real_correct_prediction = tf.equal(tf.argmax(Dx, 1), tf.argmax(yx, 1))
-real_accuracy = tf.reduce_mean(tf.cast(real_correct_prediction, tf.float32))
+# real_correct_prediction = tf.equal(tf.argmax(Dx, 1), tf.argmax(yx, 1))
+# real_accuracy = tf.reduce_mean(tf.cast(real_correct_prediction, tf.float32))
 
-generated_correct_prediction = tf.equal(tf.argmax(Dg, 1), tf.argmax(yg, 1))
-generated_accuracy = tf.reduce_mean(tf.cast(generated_correct_prediction, tf.float32))
+# generated_correct_prediction = tf.equal(tf.argmax(Dg, 1), tf.argmax(yg, 1))
+# generated_accuracy = tf.reduce_mean(tf.cast(generated_correct_prediction, tf.float32))
 
 vars = tf.trainable_variables()
 for v in vars:
@@ -191,12 +220,12 @@ with tf.Session() as session:
             g_epoch_losses.append(g_batch_loss)
 
         if step % 100 == 0:
-            real_train_accuracy, generated_train_accuracy = session.run([real_accuracy, generated_accuracy])
             print('{}: discriminator loss {:.8f}\tgenerator loss {:.8f}'.format(step, np.mean(d_epoch_losses), np.mean(g_epoch_losses)))
             d_epoch_losses = []
             g_epoch_losses = []
-            print('label accuracy: {}'.format(real_train_accuracy))
-            print('real/fake accurary: {}'.format(generated_train_accuracy))
+            # real_train_accuracy, generated_train_accuracy = session.run([real_accuracy, generated_accuracy])
+            # print('label accuracy: {}'.format(real_train_accuracy))
+            # print('real/fake accurary: {}'.format(generated_train_accuracy))
 
         if step % 100 == 0:
             current_step_time = time.time()
