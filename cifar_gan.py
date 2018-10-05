@@ -1,10 +1,11 @@
 """Basic GAN to generate mnist images."""
 import tensorflow as tf
 import numpy as np
-import time
 
+import time
 import os
 import sys
+import shutil
 
 import save_images
 import custom_layers
@@ -188,6 +189,12 @@ g_opt = tf.train.AdamOptimizer(1e-4).minimize(loss_g, var_list=g_params)
 d_saver = tf.train.Saver(d_params)
 g_saver = tf.train.Saver(g_params)
 
+start_time = time.time()
+sample_directory = 'generated_images/cifar/{}'.format(start_time)
+if not os.path.exists(sample_directory):
+    os.makedirs(sample_directory)
+shutil.copy(os.path.abspath(__file__), sample_directory)
+
 with tf.Session() as session:
     tf.local_variables_initializer().run()
     tf.global_variables_initializer().run()
@@ -210,9 +217,7 @@ with tf.Session() as session:
     else:
         print('no checkpoint specified, starting training from scratch')
 
-    start_time = time.time()
     previous_step_time = time.time()
-    sample_directory = 'generated_images/cifar/{}'.format(start_time)
     d_epoch_losses = []
     g_epoch_losses = []
     for step in range(1, 2000001):
@@ -242,8 +247,6 @@ with tf.Session() as session:
         if step % 1000 == 0:
             gen_image = session.run(G)
             real_image, real_labels = session.run([x, x_indices])
-            if not os.path.exists(sample_directory):
-                os.makedirs(sample_directory)
             save_images.save_images(np.reshape(gen_image, [100, 32, 32, 3]), [10, 10], sample_directory + '/{}gen.png'.format(step))
             save_images.save_images(np.reshape(real_image, [100, 32, 32, 3]), [10, 10], sample_directory + '/{}real.png'.format(step))
             print('Real image labels:\n{}'.format([cifar_categories[rl] for rl in real_labels]))
