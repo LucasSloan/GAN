@@ -140,11 +140,12 @@ def discriminator(x):
     h_conv1 = tf.nn.leaky_relu(ops.conv2d(x, 32, 5, 5, 2, 2, name="h_conv1", use_sn=True))
 
     h_conv2 = tf.nn.leaky_relu(ops.conv2d(h_conv1, 64, 5, 5, 2, 2, name="h_conv2", use_sn=True))
+    h_conv2_flat = tf.reshape(h_conv2, [-1, 8 * 8 * 64])
 
-    h_conv3 = tf.nn.leaky_relu(ops.conv2d(h_conv2, 128, 5, 5, 2, 2, name="h_conv3", use_sn=True))
-    h_conv3_flat = tf.reshape(h_conv3, [-1, 4 * 4 * 128])
+    # h_conv3 = tf.nn.leaky_relu(ops.conv2d(h_conv2, 128, 5, 5, 2, 2, name="h_conv3", use_sn=True))
+    # h_conv3_flat = tf.reshape(h_conv3, [-1, 4 * 4 * 128])
 
-    f1 = tf.nn.leaky_relu(ops.linear(h_conv3_flat, 1024, scope="f1", use_sn=True))
+    f1 = tf.nn.leaky_relu(ops.linear(h_conv2_flat, 1024, scope="f1", use_sn=True))
 
     f2 = tf.nn.sigmoid(ops.linear(f1, 1, scope="f2", use_sn=True))
 
@@ -222,7 +223,7 @@ with tf.Session() as session:
     g_epoch_losses = []
     for step in range(1, 2000001):
         # update discriminator
-        for i in range(5):
+        for i in range(1):
             d_batch_loss, _ = session.run([loss_d, d_opt])
             d_epoch_losses.append(d_batch_loss)
 
