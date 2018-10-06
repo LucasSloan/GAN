@@ -41,8 +41,8 @@ def load_images_and_labels(batch_size):
 
     dataset = dataset.batch(batch_size)
     # dataset = dataset.cache()
-    # dataset = dataset.repeat()
-    dataset = dataset.apply(tf.contrib.data.shuffle_and_repeat(10000))
+    dataset = dataset.repeat()
+    # dataset = dataset.apply(tf.contrib.data.shuffle_and_repeat(10000))
     dataset = dataset.prefetch(batch_size)
     return dataset.make_one_shot_iterator()
 
@@ -81,6 +81,8 @@ with tf.variable_scope('G'):
     z = tf.random_uniform([100, 100])
     G = generator(z)
 
+image_summary = tf.summary.image("generated image", G, 10)
+
 images_and_labels = load_images_and_labels(100).get_next()
 x = images_and_labels[0]
 x.set_shape([100, 32, 32, 3])
@@ -95,6 +97,8 @@ with tf.variable_scope('D', reuse=True):
 
 loss_d = -tf.reduce_mean(tf.log(Dx) + tf.log(1.-Dg)) #This optimizes the discriminator.
 loss_g = -tf.reduce_mean(tf.log(Dg)) #This optimizes the generator.
+loss_d_summary = tf.summary.scalar("discriminator loss", loss_d)
+loss_g_summary = tf.summary.scalar("generator loss", loss_g)
 # loss_d = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=yx, logits=Dx) + tf.nn.softmax_cross_entropy_with_logits(labels=yg, logits=Dg)) #This optimizes the discriminator.
 # loss_g = -tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=yg, logits=Dg)) #This optimizes the generator.
 
@@ -123,6 +127,8 @@ if not os.path.exists(sample_directory):
 shutil.copy(os.path.abspath(__file__), sample_directory)
 
 with tf.Session() as session:
+    writer = tf.summary.FileWriter(sample_directory, session.graph)
+
     tf.local_variables_initializer().run()
     tf.global_variables_initializer().run()
 
@@ -150,13 +156,15 @@ with tf.Session() as session:
     for step in range(1, 2000001):
         # update discriminator
         for i in range(1):
-            d_batch_loss, _ = session.run([loss_d, d_opt])
+            summary, d_batch_loss, _ = session.run([loss_d_summary, loss_d, d_opt])
             d_epoch_losses.append(d_batch_loss)
+            writer.add_summary(summary, step)
 
         # update generator
         for i in range(1):
-            g_batch_loss, _ = session.run([loss_g, g_opt])
+            summary, g_batch_loss, _ = session.run([loss_g_summary, loss_g, g_opt])
             g_epoch_losses.append(g_batch_loss)
+            writer.add_summary(summary, step)
 
         if step % 100 == 0:
             print('{}: discriminator loss {:.8f}\tgenerator loss {:.8f}'.format(step, np.mean(d_epoch_losses), np.mean(g_epoch_losses)))
@@ -172,11 +180,12 @@ with tf.Session() as session:
             previous_step_time = current_step_time
 
         if step % 1000 == 0:
-            gen_image = session.run(G)
+            summary, gen_image = session.run([image_summary, G])
             real_image, real_labels = session.run([x, x_indices])
             save_images.save_images(np.reshape(gen_image, [100, 32, 32, 3]), [10, 10], sample_directory + '/{}gen.png'.format(step))
             save_images.save_images(np.reshape(real_image, [100, 32, 32, 3]), [10, 10], sample_directory + '/{}real.png'.format(step))
             print('Real image labels:\n{}'.format([cifar_categories[rl] for rl in real_labels]))
+            writer.add_summary(summary, step)
 
         if step % 1000 == 0:
             d_checkpoint_dir = sample_directory + "/disciminator_checkpoints"
