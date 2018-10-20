@@ -155,7 +155,7 @@ with tf.Session() as session:
     g_epoch_losses = []
     for step in range(1, 2000001):
         # update discriminator
-        for i in range(1):
+        for i in range(5):
             summary, d_batch_loss, _ = session.run([loss_d_summary, loss_d, d_opt])
             d_epoch_losses.append(d_batch_loss)
             writer.add_summary(summary, step)
