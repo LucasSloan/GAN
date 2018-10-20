@@ -52,14 +52,14 @@ initializer = tf.truncated_normal_initializer(stddev=0.02)
 
 def generator(z):
     f1 = tf.layers.dense(z, 1024, tf.nn.leaky_relu)
-    f1 = tf.layers.batch_normalization(f1)
+    f1 = tf.layers.batch_normalization(f1, training=True)
 
     f2 = tf.layers.dense(f1, 8 * 8 * 64, tf.nn.leaky_relu)
     f2 = tf.reshape(f2, [-1, 8, 8, 64])
-    f2 = tf.layers.batch_normalization(f2)
+    f2 = tf.layers.batch_normalization(f2, training=True)
 
     conv1 = tf.layers.conv2d_transpose(f2, 32, [5, 5], strides=(2, 2), padding="same", activation=tf.nn.leaky_relu)
-    conv1 = tf.layers.batch_normalization(conv1)
+    conv1 = tf.layers.batch_normalization(conv1, training=True)
 
     conv2 = tf.layers.conv2d_transpose(conv1, 3, [5, 5], strides=(2, 2), padding="same", activation=tf.nn.tanh)
 
