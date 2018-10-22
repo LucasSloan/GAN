@@ -29,8 +29,8 @@ def text_to_one_hot(text_label):
 
 
 def load_images_and_labels(batch_size):
-    image_files_dataset = tf.data.Dataset.list_files("E:\\cifar10\\train\\*")
-    image_files_dataset = image_files_dataset.concatenate(tf.data.Dataset.list_files("E:\\cifar10\\test\\*"))
+    image_files_dataset = tf.data.Dataset.list_files("E:\\cifar10\\train\\*", shuffle=False)
+    image_files_dataset = image_files_dataset.concatenate(tf.data.Dataset.list_files("E:\\cifar10\\test\\*", shuffle=False))
     image_dataset = image_files_dataset.map(parse_images, num_parallel_calls=8)
 
     label_lines_dataset = tf.data.TextLineDataset(["E:\\cifar10\\Train_cntk_text.txt", "E:\\cifar10\\Test_cntk_text.txt"])
@@ -73,9 +73,10 @@ def discriminator(x):
 
     f1 = tf.nn.leaky_relu(ops.linear(h_conv2_flat, 1024, scope="f1", use_sn=True))
 
-    f2 = tf.nn.sigmoid(ops.linear(f1, 1, scope="f2", use_sn=True))
-
+    f2 = ops.linear(f1, 11, scope="f2", use_sn=True)
     return f2
+    # f2 = tf.nn.sigmoid(f2)
+    # return f2
 
 with tf.variable_scope('G'):
     z = tf.random_uniform([100, 100])
@@ -95,18 +96,18 @@ with tf.variable_scope('D'):
 with tf.variable_scope('D', reuse=True):
     Dg = discriminator(G)
 
-loss_d = -tf.reduce_mean(tf.log(Dx) + tf.log(1.-Dg)) #This optimizes the discriminator.
-loss_g = -tf.reduce_mean(tf.log(Dg)) #This optimizes the generator.
+# loss_d = -tf.reduce_mean(tf.log(Dx) + tf.log(1.-Dg)) #This optimizes the discriminator.
+# loss_g = -tf.reduce_mean(tf.log(Dg)) #This optimizes the generator.
+loss_d = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=yx, logits=Dx) + tf.nn.softmax_cross_entropy_with_logits(labels=yg, logits=Dg)) #This optimizes the discriminator.
+loss_g = -tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=yg, logits=Dg)) #This optimizes the generator.
 loss_d_summary = tf.summary.scalar("discriminator loss", loss_d)
 loss_g_summary = tf.summary.scalar("generator loss", loss_g)
-# loss_d = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=yx, logits=Dx) + tf.nn.softmax_cross_entropy_with_logits(labels=yg, logits=Dg)) #This optimizes the discriminator.
-# loss_g = -tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=yg, logits=Dg)) #This optimizes the generator.
 
-# real_correct_prediction = tf.equal(tf.argmax(Dx, 1), tf.argmax(yx, 1))
-# real_accuracy = tf.reduce_mean(tf.cast(real_correct_prediction, tf.float32))
+real_correct_prediction = tf.equal(tf.argmax(Dx, 1), tf.argmax(yx, 1))
+real_accuracy = tf.reduce_mean(tf.cast(real_correct_prediction, tf.float32))
 
-# generated_correct_prediction = tf.equal(tf.argmax(Dg, 1), tf.argmax(yg, 1))
-# generated_accuracy = tf.reduce_mean(tf.cast(generated_correct_prediction, tf.float32))
+generated_correct_prediction = tf.equal(tf.argmax(Dg, 1), tf.argmax(yg, 1))
+generated_accuracy = tf.reduce_mean(tf.cast(generated_correct_prediction, tf.float32))
 
 vars = tf.trainable_variables()
 for v in vars:
@@ -170,9 +171,9 @@ with tf.Session() as session:
             print('{}: discriminator loss {:.8f}\tgenerator loss {:.8f}'.format(step, np.mean(d_epoch_losses), np.mean(g_epoch_losses)))
             d_epoch_losses = []
             g_epoch_losses = []
-            # real_train_accuracy, generated_train_accuracy = session.run([real_accuracy, generated_accuracy])
-            # print('label accuracy: {}'.format(real_train_accuracy))
-            # print('real/fake accurary: {}'.format(generated_train_accuracy))
+            real_train_accuracy, generated_train_accuracy = session.run([real_accuracy, generated_accuracy])
+            print('label accuracy: {}'.format(real_train_accuracy))
+            print('real/fake accurary: {}'.format(generated_train_accuracy))
 
         if step % 100 == 0:
             current_step_time = time.time()
