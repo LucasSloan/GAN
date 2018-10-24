@@ -54,24 +54,29 @@ def generator(z):
     f1 = tf.layers.dense(z, 1024, tf.nn.leaky_relu)
     f1 = tf.layers.batch_normalization(f1, training=True)
 
-    f2 = tf.layers.dense(f1, 8 * 8 * 64, tf.nn.leaky_relu)
-    f2 = tf.reshape(f2, [-1, 8, 8, 64])
+    f2 = tf.layers.dense(f1, 4*4*128, tf.nn.leaky_relu)
+    f2 = tf.reshape(f2, [-1, 4, 4, 128])
     f2 = tf.layers.batch_normalization(f2, training=True)
 
     conv1 = tf.layers.conv2d_transpose(f2, 32, [5, 5], strides=(2, 2), padding="same", activation=tf.nn.leaky_relu)
     conv1 = tf.layers.batch_normalization(conv1, training=True)
 
-    conv2 = tf.layers.conv2d_transpose(conv1, 3, [5, 5], strides=(2, 2), padding="same", activation=tf.nn.tanh)
+    conv2 = tf.layers.conv2d_transpose(conv1, 32, [5, 5], strides=(2, 2), padding="same", activation=tf.nn.leaky_relu)
+    conv2 = tf.layers.batch_normalization(conv2, training=True)
 
-    return conv2
+    conv3 = tf.layers.conv2d_transpose(conv2, 3, [5, 5], strides=(2, 2), padding="same", activation=tf.nn.tanh)
+
+    return conv3
 
 def discriminator(x):
     h_conv1 = tf.nn.leaky_relu(ops.conv2d(x, 32, 5, 5, 2, 2, name="h_conv1", use_sn=True))
 
     h_conv2 = tf.nn.leaky_relu(ops.conv2d(h_conv1, 64, 5, 5, 2, 2, name="h_conv2", use_sn=True))
-    h_conv2_flat = tf.reshape(h_conv2, [-1, 8*8*64])
 
-    f1 = tf.nn.leaky_relu(ops.linear(h_conv2_flat, 1024, scope="f1", use_sn=True))
+    h_conv3 = tf.nn.leaky_relu(ops.conv2d(h_conv2, 128, 5, 5, 2, 2, name="h_conv3", use_sn=True))
+    h_conv3_flat = tf.reshape(h_conv3, [-1, 4*4*128])
+
+    f1 = tf.nn.leaky_relu(ops.linear(h_conv3_flat, 1024, scope="f1", use_sn=True))
 
     f2 = ops.linear(f1, 11, scope="f2", use_sn=True)
     return f2
