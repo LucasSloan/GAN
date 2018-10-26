@@ -13,7 +13,7 @@ import ops
 
 # Constants
 CIFAR_CATEGORIES = ["airplane", "automobile", "bird", "cat", "deer", "dog", "frog", "horse", "ship", "truck"]
-USE_SN = False
+USE_SN = True
 
 def parse_images(filename):
   image_string = tf.read_file(filename)
