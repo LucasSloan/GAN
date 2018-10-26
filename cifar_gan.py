@@ -11,7 +11,9 @@ import save_images
 import custom_layers
 import ops
 
-cifar_categories = ["airplane", "automobile", "bird", "cat", "deer", "dog", "frog", "horse", "ship", "truck"]
+# Constants
+CIFAR_CATEGORIES = ["airplane", "automobile", "bird", "cat", "deer", "dog", "frog", "horse", "ship", "truck"]
+USE_SN = False
 
 def parse_images(filename):
   image_string = tf.read_file(filename)
@@ -69,16 +71,16 @@ def generator(z):
     return conv3
 
 def discriminator(x):
-    h_conv1 = tf.nn.leaky_relu(ops.conv2d(x, 32, 5, 5, 2, 2, name="h_conv1", use_sn=True))
+    h_conv1 = tf.nn.leaky_relu(ops.conv2d(x, 32, 5, 5, 2, 2, name="h_conv1", use_sn=USE_SN))
 
-    h_conv2 = tf.nn.leaky_relu(ops.conv2d(h_conv1, 64, 5, 5, 2, 2, name="h_conv2", use_sn=True))
+    h_conv2 = tf.nn.leaky_relu(ops.conv2d(h_conv1, 64, 5, 5, 2, 2, name="h_conv2", use_sn=USE_SN))
 
-    h_conv3 = tf.nn.leaky_relu(ops.conv2d(h_conv2, 128, 5, 5, 2, 2, name="h_conv3", use_sn=True))
+    h_conv3 = tf.nn.leaky_relu(ops.conv2d(h_conv2, 128, 5, 5, 2, 2, name="h_conv3", use_sn=USE_SN))
     h_conv3_flat = tf.reshape(h_conv3, [-1, 4*4*128])
 
-    f1 = tf.nn.leaky_relu(ops.linear(h_conv3_flat, 1024, scope="f1", use_sn=True))
+    f1 = tf.nn.leaky_relu(ops.linear(h_conv3_flat, 1024, scope="f1", use_sn=USE_SN))
 
-    f2 = ops.linear(f1, 11, scope="f2", use_sn=True)
+    f2 = ops.linear(f1, 11, scope="f2", use_sn=USE_SN)
     return f2
     # f2 = tf.nn.sigmoid(f2)
     # return f2
@@ -190,7 +192,7 @@ with tf.Session() as session:
             real_image, real_labels = session.run([x, x_indices])
             save_images.save_images(np.reshape(gen_image, [100, 32, 32, 3]), [10, 10], sample_directory + '/{}gen.png'.format(step))
             save_images.save_images(np.reshape(real_image, [100, 32, 32, 3]), [10, 10], sample_directory + '/{}real.png'.format(step))
-            print('Real image labels:\n{}'.format([cifar_categories[rl] for rl in real_labels]))
+            print('Real image labels:\n{}'.format([CIFAR_CATEGORIES[rl] for rl in real_labels]))
             writer.add_summary(summary, step)
 
         if step % 1000 == 0:
