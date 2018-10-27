@@ -14,6 +14,7 @@ import ops
 # Constants
 CIFAR_CATEGORIES = ["airplane", "automobile", "bird", "cat", "deer", "dog", "frog", "horse", "ship", "truck"]
 USE_SN = True
+LABEL_BASED_DISCRIMINATOR = True
 
 def parse_images(filename):
   image_string = tf.read_file(filename)
@@ -80,10 +81,12 @@ def discriminator(x):
 
     f1 = tf.nn.leaky_relu(ops.linear(h_conv3_flat, 1024, scope="f1", use_sn=USE_SN))
 
-    f2 = ops.linear(f1, 11, scope="f2", use_sn=USE_SN)
-    return f2
-    # f2 = tf.nn.sigmoid(f2)
-    # return f2
+    if LABEL_BASED_DISCRIMINATOR:
+        f2 = ops.linear(f1, 11, scope="f2", use_sn=USE_SN)
+        return f2
+    else:
+        f2 = tf.nn.sigmoid(ops.linear(f1, 1, scope="f2", use_sn=USE_SN))
+        return f2
 
 with tf.variable_scope('G'):
     z = tf.random_uniform([100, 100])
@@ -103,18 +106,21 @@ with tf.variable_scope('D'):
 with tf.variable_scope('D', reuse=True):
     Dg = discriminator(G)
 
-# loss_d = -tf.reduce_mean(tf.log(Dx) + tf.log(1.-Dg)) #This optimizes the discriminator.
-# loss_g = -tf.reduce_mean(tf.log(Dg)) #This optimizes the generator.
-loss_d = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=yx, logits=Dx) + tf.nn.softmax_cross_entropy_with_logits(labels=yg, logits=Dg)) #This optimizes the discriminator.
-loss_g = -tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=yg, logits=Dg)) #This optimizes the generator.
+if LABEL_BASED_DISCRIMINATOR:
+    loss_d = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=yx, logits=Dx) + tf.nn.softmax_cross_entropy_with_logits(labels=yg, logits=Dg)) #This optimizes the discriminator.
+    loss_g = -tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=yg, logits=Dg)) #This optimizes the generator.
+else:
+    loss_d = -tf.reduce_mean(tf.log(Dx) + tf.log(1.-Dg)) #This optimizes the discriminator.
+    loss_g = -tf.reduce_mean(tf.log(Dg)) #This optimizes the generator.
 loss_d_summary = tf.summary.scalar("discriminator loss", loss_d)
 loss_g_summary = tf.summary.scalar("generator loss", loss_g)
 
-real_correct_prediction = tf.equal(tf.argmax(Dx, 1), tf.argmax(yx, 1))
-real_accuracy = tf.reduce_mean(tf.cast(real_correct_prediction, tf.float32))
+if LABEL_BASED_DISCRIMINATOR:
+    real_correct_prediction = tf.equal(tf.argmax(Dx, 1), tf.argmax(yx, 1))
+    real_accuracy = tf.reduce_mean(tf.cast(real_correct_prediction, tf.float32))
 
-generated_correct_prediction = tf.equal(tf.argmax(Dg, 1), tf.argmax(yg, 1))
-generated_accuracy = tf.reduce_mean(tf.cast(generated_correct_prediction, tf.float32))
+    generated_correct_prediction = tf.equal(tf.argmax(Dg, 1), tf.argmax(yg, 1))
+    generated_accuracy = tf.reduce_mean(tf.cast(generated_correct_prediction, tf.float32))
 
 vars = tf.trainable_variables()
 for v in vars:
@@ -178,6 +184,8 @@ with tf.Session() as session:
             print('{}: discriminator loss {:.8f}\tgenerator loss {:.8f}'.format(step, np.mean(d_epoch_losses), np.mean(g_epoch_losses)))
             d_epoch_losses = []
             g_epoch_losses = []
+
+        if step % 100 == 0 and LABEL_BASED_DISCRIMINATOR:
             real_train_accuracy, generated_train_accuracy = session.run([real_accuracy, generated_accuracy])
             print('label accuracy: {}'.format(real_train_accuracy))
             print('real/fake accurary: {}'.format(generated_train_accuracy))
