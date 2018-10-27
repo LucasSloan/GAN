@@ -14,7 +14,7 @@ import ops
 # Constants
 CIFAR_CATEGORIES = ["airplane", "automobile", "bird", "cat", "deer", "dog", "frog", "horse", "ship", "truck"]
 USE_SN = True
-LABEL_BASED_DISCRIMINATOR = True
+LABEL_BASED_DISCRIMINATOR = False
 OUTPUT_REAL_IMAGES = False
 
 def parse_images(filename):
@@ -197,9 +197,19 @@ with tf.Session() as session:
             previous_step_time = current_step_time
 
         if step % 1000 == 0:
-            summary, gen_image = session.run([image_summary, G])
+            summary, gen_image, discriminator_confidence = session.run([image_summary, G, Dg])
             save_images.save_images(np.reshape(gen_image, [100, 32, 32, 3]), [10, 10], sample_directory + '/{}gen.png'.format(step))
             writer.add_summary(summary, step)
+            min_discriminator_confidence = np.min(discriminator_confidence)
+            max_discriminator_confidence = np.max(discriminator_confidence)
+            print("minimum discriminator confidence: {:.4f} maximum discriminator confidence: {:.4f}\n".format(min_discriminator_confidence, max_discriminator_confidence))
+            min_confidence_index = np.argmin(discriminator_confidence)
+            max_confidence_index = np.argmax(discriminator_confidence)
+            min_max_image = np.ndarray([2, 32, 32, 3])
+            min_max_image[0] = gen_image[min_confidence_index]
+            min_max_image[1] = gen_image[max_confidence_index]
+            print("minimum confidence index: {} maximum confidence index: {}".format(min_confidence_index, max_confidence_index))
+            save_images.save_images(min_max_image, [2, 1], sample_directory + '/{}gen_min_max.png'.format(step))
 
         if step % 1000 == 0 and OUTPUT_REAL_IMAGES:
             real_image, real_labels = session.run([x, x_indices])
