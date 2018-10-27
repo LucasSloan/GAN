@@ -15,6 +15,7 @@ import ops
 CIFAR_CATEGORIES = ["airplane", "automobile", "bird", "cat", "deer", "dog", "frog", "horse", "ship", "truck"]
 USE_SN = True
 LABEL_BASED_DISCRIMINATOR = True
+OUTPUT_REAL_IMAGES = False
 
 def parse_images(filename):
   image_string = tf.read_file(filename)
@@ -197,11 +198,14 @@ with tf.Session() as session:
 
         if step % 1000 == 0:
             summary, gen_image = session.run([image_summary, G])
-            real_image, real_labels = session.run([x, x_indices])
             save_images.save_images(np.reshape(gen_image, [100, 32, 32, 3]), [10, 10], sample_directory + '/{}gen.png'.format(step))
+            writer.add_summary(summary, step)
+
+        if step % 1000 == 0 and OUTPUT_REAL_IMAGES:
+            real_image, real_labels = session.run([x, x_indices])
             save_images.save_images(np.reshape(real_image, [100, 32, 32, 3]), [10, 10], sample_directory + '/{}real.png'.format(step))
             print('Real image labels:\n{}'.format([CIFAR_CATEGORIES[rl] for rl in real_labels]))
-            writer.add_summary(summary, step)
+
 
         if step % 1000 == 0:
             d_checkpoint_dir = sample_directory + "/disciminator_checkpoints"
