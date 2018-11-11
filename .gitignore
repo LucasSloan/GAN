@@ -6,3 +6,5 @@ mnist_from_web.py
 mnist_wasserstein_gan_from_web.py
 data.py
 download.py
+.vscode/
+__pycache__/
