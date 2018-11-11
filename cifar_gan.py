@@ -10,6 +10,8 @@ import shutil
 import save_images
 import custom_layers
 import ops
+import resnet_architecture
+import consts
 
 # Constants
 CIFAR_CATEGORIES = ["airplane", "automobile", "bird", "cat", "deer", "dog", "frog", "horse", "ship", "truck"]
@@ -149,9 +151,11 @@ x_indices = images_and_labels[2]
 yg = tf.reshape(tf.tile(tf.one_hot(10, 11), [100]), [100, 11])
 
 with tf.variable_scope('D'):
-    Dx = discriminator(x)
-with tf.variable_scope('D', reuse=True):
-    Dg = discriminator(G)
+    Dx, _, _ = resnet_architecture.resnet_cifar_discriminator(x, True, consts.SPECTRAL_NORM, reuse=False)
+    Dg, _, _ = resnet_architecture.resnet_cifar_discriminator(G, True, consts.SPECTRAL_NORM, reuse=True)
+#     Dx = discriminator(x)
+# with tf.variable_scope('D', reuse=True):
+#     Dg = discriminator(G)
 
 if LABEL_BASED_DISCRIMINATOR:
     loss_d = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=yx, logits=Dx) + tf.nn.softmax_cross_entropy_with_logits(labels=yg, logits=Dg)) #This optimizes the discriminator.
