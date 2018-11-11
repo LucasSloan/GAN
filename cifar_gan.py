@@ -72,15 +72,61 @@ def generator(z):
 
     return conv3
 
+def residual_block(input, channels, downsample, name):
+    shortcut = input
+    stride = 1
+    if downsample:
+        stride = 2
+        shortcut = ops.conv2d(input, channels, 1, 1, stride, stride, name=name + "_shortcut", use_sn=USE_SN)
+        # shortcut = tf.layers.batch_normalization(shortcut, training=True)
+        
+    conv1 = ops.conv2d(input, channels, 3, 3, 1, 1, name=name + "_conv1", use_sn=USE_SN)
+    # conv1 = tf.layers.batch_normalization(conv1, training=True)
+    conv1 = tf.nn.leaky_relu(conv1)
+
+    conv2 = ops.conv2d(conv1, channels, 3, 3, stride, stride, name=name + "_conv2", use_sn=USE_SN)
+    # conv2 = tf.layers.batch_normalization(conv2, training=True)
+
+
+    conv2 += shortcut
+    output = tf.nn.leaky_relu(conv2)
+
+    return output
+
 def discriminator(x):
-    h_conv1 = tf.nn.leaky_relu(ops.conv2d(x, 32, 5, 5, 2, 2, name="h_conv1", use_sn=USE_SN))
+    # h_conv1 = tf.nn.leaky_relu(ops.conv2d(x, 32, 5, 5, 2, 2, name="h_conv1", use_sn=USE_SN))
 
-    h_conv2 = tf.nn.leaky_relu(ops.conv2d(h_conv1, 64, 5, 5, 2, 2, name="h_conv2", use_sn=USE_SN))
+    # h_conv2 = tf.nn.leaky_relu(ops.conv2d(h_conv1, 64, 5, 5, 2, 2, name="h_conv2", use_sn=USE_SN))
 
-    h_conv3 = tf.nn.leaky_relu(ops.conv2d(h_conv2, 128, 5, 5, 2, 2, name="h_conv3", use_sn=USE_SN))
-    h_conv3_flat = tf.reshape(h_conv3, [-1, 4*4*128])
+    # h_conv3 = tf.nn.leaky_relu(ops.conv2d(h_conv2, 128, 5, 5, 2, 2, name="h_conv3", use_sn=USE_SN))
+    # h_conv3_flat = tf.reshape(h_conv3, [-1, 4*4*128])
 
-    f1 = tf.nn.leaky_relu(ops.linear(h_conv3_flat, 1024, scope="f1", use_sn=USE_SN))
+    conv1 = tf.nn.relu(ops.conv2d(x, 16, 3, 3, 1, 1, name="conv1", use_sn=USE_SN))
+
+    # 32x32x3 -> 32x32x16
+    res1_1 = residual_block(conv1, 16, False, "res1_1")
+    res1_2 = residual_block(res1_1, 16, False, "res1_2")
+    res1_3 = residual_block(res1_2, 16, False, "res1_3")
+
+    ...
+
+    # 32x32x16 -> 16x16x32
+    res2_1 = residual_block(res1_3, 32, True, "res2_1")
+    res2_2 = residual_block(res2_1, 32, False, "res2_2")
+    res2_3 = residual_block(res2_2, 32, False, "res2_3")
+
+    ...
+
+    # 16x16x32 -> 8x8x64
+    res3_1 = residual_block(res2_3, 64, True, "res3_1")
+    res3_2 = residual_block(res3_1, 64, False, "res3_2")
+    res3_3 = residual_block(res3_2, 64, False, "res3_3")
+
+    ...
+
+    res3_flat = tf.reshape(res3_3, [-1, 8*8*64])
+
+    f1 = tf.nn.leaky_relu(ops.linear(res3_flat, 1024, scope="f1", use_sn=USE_SN))
 
     if LABEL_BASED_DISCRIMINATOR:
         f2 = ops.linear(f1, 11, scope="f2", use_sn=USE_SN)
@@ -168,7 +214,7 @@ with tf.Session() as session:
     previous_step_time = time.time()
     d_epoch_losses = []
     g_epoch_losses = []
-    for step in range(1, 2000001):
+    for step in range(1, 200001):
         # update discriminator
         for i in range(5):
             summary, d_batch_loss, _ = session.run([loss_d_summary, loss_d, d_opt])
