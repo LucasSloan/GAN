@@ -18,6 +18,7 @@ CIFAR_CATEGORIES = ["airplane", "automobile", "bird", "cat", "deer", "dog", "fro
 USE_SN = True
 LABEL_BASED_DISCRIMINATOR = False
 OUTPUT_REAL_IMAGES = False
+DATA_DIR = "/home/lucas/training_data/cifar10/"
 
 def parse_images(filename):
   image_string = tf.read_file(filename)
@@ -35,11 +36,11 @@ def text_to_one_hot(text_label):
 
 
 def load_images_and_labels(batch_size):
-    image_files_dataset = tf.data.Dataset.list_files("E:\\cifar10\\train\\*", shuffle=False)
-    image_files_dataset = image_files_dataset.concatenate(tf.data.Dataset.list_files("E:\\cifar10\\test\\*", shuffle=False))
-    image_dataset = image_files_dataset.map(parse_images, num_parallel_calls=8)
+    image_files_dataset = tf.data.Dataset.list_files(DATA_DIR + "train/*", shuffle=False)
+    image_files_dataset = image_files_dataset.concatenate(tf.data.Dataset.list_files(DATA_DIR + "test/*", shuffle=False))
+    image_dataset = image_files_dataset.map(parse_images, num_parallel_calls=32)
 
-    label_lines_dataset = tf.data.TextLineDataset(["E:\\cifar10\\Train_cntk_text.txt", "E:\\cifar10\\Test_cntk_text.txt"])
+    label_lines_dataset = tf.data.TextLineDataset([DATA_DIR + "Train_cntk_text.txt", DATA_DIR + "Test_cntk_text.txt"])
     label_dataset = label_lines_dataset.map(text_to_one_hot)
     index_dataset = label_lines_dataset.map(text_to_index)
 
