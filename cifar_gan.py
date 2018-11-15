@@ -18,7 +18,11 @@ CIFAR_CATEGORIES = ["airplane", "automobile", "bird", "cat", "deer", "dog", "fro
 USE_SN = True
 LABEL_BASED_DISCRIMINATOR = False
 OUTPUT_REAL_IMAGES = False
-DATA_DIR = "/home/lucas/training_data/cifar10/"
+flags = tf.app.flags
+FLAGS = flags.FLAGS
+
+flags.DEFINE_string("data_dir", "/home/lucas/training_data/cifar10/", "Directory to read the training data from.")
+flags.DEFINE_string("checkpoint_dir", None, "Directory to load model state from to resume training.")
 
 def parse_images(filename):
   image_string = tf.read_file(filename)
@@ -36,11 +40,11 @@ def text_to_one_hot(text_label):
 
 
 def load_images_and_labels(batch_size):
-    image_files_dataset = tf.data.Dataset.list_files(DATA_DIR + "train/*", shuffle=False)
-    image_files_dataset = image_files_dataset.concatenate(tf.data.Dataset.list_files(DATA_DIR + "test/*", shuffle=False))
+    image_files_dataset = tf.data.Dataset.list_files(FLAGS.data_dir + "train/*", shuffle=False)
+    image_files_dataset = image_files_dataset.concatenate(tf.data.Dataset.list_files(FLAGS.data_dir + "test/*", shuffle=False))
     image_dataset = image_files_dataset.map(parse_images, num_parallel_calls=32)
 
-    label_lines_dataset = tf.data.TextLineDataset([DATA_DIR + "Train_cntk_text.txt", DATA_DIR + "Test_cntk_text.txt"])
+    label_lines_dataset = tf.data.TextLineDataset([FLAGS.data_dir + "Train_cntk_text.txt", FLAGS.data_dir + "Test_cntk_text.txt"])
     label_dataset = label_lines_dataset.map(text_to_one_hot)
     index_dataset = label_lines_dataset.map(text_to_index)
 
@@ -198,17 +202,16 @@ with tf.Session() as session:
     tf.local_variables_initializer().run()
     tf.global_variables_initializer().run()
 
-    if len(sys.argv) > 1:
-        checkpoint_dir = sys.argv[1]
-        print('attempting to load checkpoint from {}'.format(checkpoint_dir))
+    if FLAGS.checkpoint_dir is not None:
+        print('attempting to load checkpoint from {}'.format(FLAGS.checkpoint_dir))
         
-        d_checkpoint_dir = checkpoint_dir + "/disciminator_checkpoints"
+        d_checkpoint_dir = FLAGS.checkpoint_dir + "/disciminator_checkpoints"
         d_checkpoint = tf.train.get_checkpoint_state(d_checkpoint_dir)
         if d_checkpoint and d_checkpoint.model_checkpoint_path:
             d_saver.restore(session, d_checkpoint.model_checkpoint_path)
             print(d_checkpoint)
 
-        g_checkpoint_dir = checkpoint_dir + "/generator_checkpoints"
+        g_checkpoint_dir = FLAGS.checkpoint_dir + "/generator_checkpoints"
         g_checkpoint = tf.train.get_checkpoint_state(g_checkpoint_dir)
         if g_checkpoint and g_checkpoint.model_checkpoint_path:
             g_saver.restore(session, g_checkpoint.model_checkpoint_path)
