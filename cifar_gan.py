@@ -104,38 +104,38 @@ def discriminator(x):
     # h_conv3 = tf.nn.leaky_relu(ops.conv2d(h_conv2, 128, 5, 5, 2, 2, name="h_conv3", use_sn=USE_SN))
     # h_conv3_flat = tf.reshape(h_conv3, [-1, 4*4*128])
 
-    conv1 = tf.nn.relu(ops.conv2d(x, 16, 3, 3, 1, 1, name="conv1", use_sn=USE_SN))
+    # conv1 = tf.nn.relu(ops.conv2d(x, 16, 3, 3, 1, 1, name="conv1", use_sn=USE_SN))
 
-    # 32x32x3 -> 32x32x16
-    res1_1 = residual_block(conv1, 16, False, "res1_1")
+    # 32x32x3 -> 16x16x16
+    res1_1 = residual_block(x, 16, True, "res1_1")
     res1_2 = residual_block(res1_1, 16, False, "res1_2")
-    res1_3 = residual_block(res1_2, 16, False, "res1_3")
+    # res1_3 = residual_block(res1_2, 16, False, "res1_3")
 
     ...
 
-    # 32x32x16 -> 16x16x32
-    res2_1 = residual_block(res1_3, 32, True, "res2_1")
+    # 16x16x16 -> 8x8x32
+    res2_1 = residual_block(res1_2, 32, True, "res2_1")
     res2_2 = residual_block(res2_1, 32, False, "res2_2")
-    res2_3 = residual_block(res2_2, 32, False, "res2_3")
+    # res2_3 = residual_block(res2_2, 32, False, "res2_3")
 
     ...
 
     # 16x16x32 -> 8x8x64
-    res3_1 = residual_block(res2_3, 64, True, "res3_1")
-    res3_2 = residual_block(res3_1, 64, False, "res3_2")
-    res3_3 = residual_block(res3_2, 64, False, "res3_3")
+    # res3_1 = residual_block(res2_3, 64, True, "res3_1")
+    # res3_2 = residual_block(res3_1, 64, False, "res3_2")
+    # res3_3 = residual_block(res3_2, 64, False, "res3_3")
 
     ...
 
-    res3_flat = tf.reshape(res3_3, [-1, 8*8*64])
+    res2_flat = tf.reshape(res2_2, [-1, 8*8*32])
 
-    f1 = tf.nn.leaky_relu(ops.linear(res3_flat, 1024, scope="f1", use_sn=USE_SN))
+    # f1 = tf.nn.leaky_relu(ops.linear(res3_flat, 1024, scope="f1", use_sn=USE_SN))
 
     if LABEL_BASED_DISCRIMINATOR:
-        f2 = ops.linear(f1, 11, scope="f2", use_sn=USE_SN)
+        f2 = ops.linear(res2_flat, 11, scope="f2", use_sn=USE_SN)
         return f2
     else:
-        f2 = tf.nn.sigmoid(ops.linear(f1, 1, scope="f2", use_sn=USE_SN))
+        f2 = tf.nn.sigmoid(ops.linear(res2_flat, 1, scope="f2", use_sn=USE_SN))
         return f2
 
 with tf.variable_scope('G'):
@@ -152,11 +152,11 @@ x_indices = images_and_labels[2]
 yg = tf.reshape(tf.tile(tf.one_hot(10, 11), [100]), [100, 11])
 
 with tf.variable_scope('D'):
-    Dx, _, _ = resnet_architecture.resnet_cifar_discriminator(x, True, consts.SPECTRAL_NORM, reuse=False)
-    Dg, _, _ = resnet_architecture.resnet_cifar_discriminator(G, True, consts.SPECTRAL_NORM, reuse=True)
-#     Dx = discriminator(x)
-# with tf.variable_scope('D', reuse=True):
-#     Dg = discriminator(G)
+    # Dx, _, _ = resnet_architecture.resnet_cifar_discriminator(x, True, consts.SPECTRAL_NORM, reuse=False)
+    # Dg, _, _ = resnet_architecture.resnet_cifar_discriminator(G, True, consts.SPECTRAL_NORM, reuse=True)
+    Dx = discriminator(x)
+with tf.variable_scope('D', reuse=True):
+    Dg = discriminator(G)
 
 if LABEL_BASED_DISCRIMINATOR:
     loss_d = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=yx, logits=Dx) + tf.nn.softmax_cross_entropy_with_logits(labels=yg, logits=Dg)) #This optimizes the discriminator.
