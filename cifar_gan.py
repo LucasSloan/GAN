@@ -60,6 +60,25 @@ def load_images_and_labels(batch_size):
 
 initializer = tf.truncated_normal_initializer(stddev=0.02)
 
+def generator_residual_block(input, channels, upsample):
+    shortcut = input
+    strides = (1, 1)
+    if upsample:
+        strides = (2, 2)
+        shortcut = tf.layers.conv2d_transpose(shortcut, channels, (1, 1), strides=strides, padding="same")
+
+    conv1 = tf.layers.conv2d_transpose(input, channels, (3, 3), strides=strides, padding="same")
+    conv1 = tf.layers.batch_normalization(conv1, training=True)
+    conv1 = tf.nn.leaky_relu(conv1)
+
+    conv2 = tf.layers.conv2d(conv1, channels, (3,3), strides=(1, 1), padding="same")
+    conv2 = tf.layers.batch_normalization(conv2, training=True)
+
+    conv2 += shortcut
+    output = tf.nn.leaky_relu(conv2)
+
+    return output
+
 
 def generator(z):
     f1 = tf.layers.dense(z, 1024, tf.nn.leaky_relu)
@@ -69,22 +88,28 @@ def generator(z):
     f2 = tf.reshape(f2, [-1, 4, 4, 128])
     f2 = tf.layers.batch_normalization(f2, training=True)
 
-    conv1 = tf.layers.conv2d_transpose(f2, 32, [5, 5], strides=(2, 2), padding="same", activation=tf.nn.leaky_relu)
-    conv1 = tf.layers.batch_normalization(conv1, training=True)
+    # conv1 = tf.layers.conv2d_transpose(f2, 32, [5, 5], strides=(2, 2), padding="same", activation=tf.nn.leaky_relu)
+    # conv1 = tf.layers.batch_normalization(conv1, training=True)
 
-    conv2 = tf.layers.conv2d_transpose(conv1, 32, [5, 5], strides=(2, 2), padding="same", activation=tf.nn.leaky_relu)
-    conv2 = tf.layers.batch_normalization(conv2, training=True)
+    # conv2 = tf.layers.conv2d_transpose(conv1, 32, [5, 5], strides=(2, 2), padding="same", activation=tf.nn.leaky_relu)
+    # conv2 = tf.layers.batch_normalization(conv2, training=True)
 
-    conv3 = tf.layers.conv2d_transpose(conv2, 3, [5, 5], strides=(2, 2), padding="same", activation=tf.nn.tanh)
+    res1_1 = generator_residual_block(f2, 32, True)
+    res1_2 = generator_residual_block(res1_1, 32, False)
+
+    res2_1 = generator_residual_block(res1_2, 16, True)
+    res2_2 = generator_residual_block(res2_1, 16, False)
+
+    conv3 = tf.layers.conv2d_transpose(res2_2, 3, (3, 3), strides=(2, 2), padding="same", activation=tf.nn.tanh)
 
     return conv3
 
-def residual_block(input, channels, downsample, name):
+def discriminator_residual_block(input, channels, downsample, name):
     shortcut = input
     stride = 1
     if downsample:
         stride = 2
-        shortcut = ops.conv2d(input, channels, 1, 1, stride, stride, name=name + "_shortcut", use_sn=USE_SN)
+        shortcut = ops.conv2d(shortcut, channels, 1, 1, stride, stride, name=name + "_shortcut", use_sn=USE_SN)
         # shortcut = tf.layers.batch_normalization(shortcut, training=True)
         
     conv1 = ops.conv2d(input, channels, 3, 3, 1, 1, name=name + "_conv1", use_sn=USE_SN)
@@ -111,15 +136,15 @@ def discriminator(x):
     # conv1 = tf.nn.relu(ops.conv2d(x, 16, 3, 3, 1, 1, name="conv1", use_sn=USE_SN))
 
     # 32x32x3 -> 16x16x16
-    res1_1 = residual_block(x, 16, True, "res1_1")
-    res1_2 = residual_block(res1_1, 16, False, "res1_2")
+    res1_1 = discriminator_residual_block(x, 16, True, "res1_1")
+    res1_2 = discriminator_residual_block(res1_1, 16, False, "res1_2")
     # res1_3 = residual_block(res1_2, 16, False, "res1_3")
 
     ...
 
     # 16x16x16 -> 8x8x32
-    res2_1 = residual_block(res1_2, 32, True, "res2_1")
-    res2_2 = residual_block(res2_1, 32, False, "res2_2")
+    res2_1 = discriminator_residual_block(res1_2, 32, True, "res2_1")
+    res2_2 = discriminator_residual_block(res2_1, 32, False, "res2_2")
     # res2_3 = residual_block(res2_2, 32, False, "res2_3")
 
     ...
