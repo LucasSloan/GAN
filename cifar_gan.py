@@ -60,18 +60,21 @@ def load_images_and_labels(batch_size):
 
 initializer = tf.truncated_normal_initializer(stddev=0.02)
 
-def generator_residual_block(input, channels, upsample):
+def generator_residual_block(input, channels, upsample, name):
     shortcut = input
     strides = (1, 1)
     if upsample:
         strides = (2, 2)
-        shortcut = tf.layers.conv2d_transpose(shortcut, channels, (1, 1), strides=strides, padding="same")
+        shortcut = resnet_architecture.get_conv(shortcut, 0, channels, "up", name + "_shortcut", False)
+        # shortcut = tf.layers.conv2d_transpose(shortcut, channels, (1, 1), strides=strides, padding="same")
 
-    conv1 = tf.layers.conv2d_transpose(input, channels, (3, 3), strides=strides, padding="same")
+    conv1 = resnet_architecture.get_conv(input, 0, channels, "up", name + "_conv1", False)
+    # conv1 = tf.layers.conv2d_transpose(input, channels, (3, 3), strides=strides, padding="same")
     conv1 = tf.layers.batch_normalization(conv1, training=True)
     conv1 = tf.nn.leaky_relu(conv1)
 
-    conv2 = tf.layers.conv2d(conv1, channels, (3,3), strides=(1, 1), padding="same")
+    conv2 = resnet_architecture.get_conv(shortcut, 0, channels, "none", name + "_conv2", False)
+    # conv2 = tf.layers.conv2d(conv1, channels, (3,3), strides=(1, 1), padding="same")
     conv2 = tf.layers.batch_normalization(conv2, training=True)
 
     conv2 += shortcut
