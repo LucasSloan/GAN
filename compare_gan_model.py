@@ -1,4 +1,5 @@
 import time
+import os
 
 import numpy as np
 import tensorflow as tf
@@ -9,8 +10,8 @@ import cifar_loader
 import save_images
 
 IS_TRAINING = True
-BATCH_SIZE = 100
-Z_DIM = 100
+BATCH_SIZE = 64
+Z_DIM = 128
 TRAINING_STEPS = 200000
 DISC_ITERS = 5
 
@@ -29,7 +30,7 @@ def get_optimizer(learning_rate, name_prefix, beta1=0.5, beta2=0.999):
         name=name_prefix + "adam")
 
 
-def discriminator(x, reuse=False, architecture=consts.RESNET_CIFAR, discriminator_normalization=consts.NO_NORMALIZATION):
+def discriminator(x, reuse=False, architecture=consts.RESNET_CIFAR, discriminator_normalization=consts.SPECTRAL_NORM):
     if architecture == consts.RESNET5_ARCH:
         return resnet_architecture.resnet5_discriminator(
             x, IS_TRAINING, discriminator_normalization, reuse)
@@ -76,18 +77,18 @@ def check_variables(t_vars, d_vars, g_vars):
 
 def print_progress(step, start_step, start_time, d_loss, g_loss):
     if step % 100 == 0:
-      time_elapsed = time.time() - start_time
-      steps_per_sec = (step - start_step) / time_elapsed
-      eta_seconds = (TRAINING_STEPS - step) / (steps_per_sec + 0.0000001)
-      eta_minutes = eta_seconds / 60.0
-      print("[%4d/%4d] time: %4.4f, d_loss: %.8f, g_loss: %.8f "
+        time_elapsed = time.time() - start_time
+        steps_per_sec = (step - start_step) / time_elapsed
+        eta_seconds = (TRAINING_STEPS - step) / (steps_per_sec + 0.0000001)
+        eta_minutes = eta_seconds / 60.0
+        print("[%4d/%4d] time: %4.4f, d_loss: %.8f, g_loss: %.8f "
             "steps_per_sec: %.4f ETA: %.2f minutes" %
             (step, TRAINING_STEPS, time_elapsed, d_loss, g_loss,
-             steps_per_sec, eta_minutes))
+            steps_per_sec, eta_minutes))
 
 def maybe_save_samples(step, gen_image, sample_directory):
     if step % 1000 == 0:
-        save_images.save_images(np.reshape(gen_image, [100, 32, 32, 3]), [10, 10], sample_directory + '/{}gen.png'.format(step))
+        save_images.save_images(np.reshape(gen_image, [BATCH_SIZE, 32, 32, 3]), [8, 8], sample_directory + '/{}gen.png'.format(step))
 
 
 # Input images.
@@ -95,7 +96,7 @@ images = cifar_loader.load_images_and_labels(
     BATCH_SIZE, FLAGS.data_dir).get_next()[0]
 images.set_shape([BATCH_SIZE, 32, 32, 3])
 # Noise vector.
-z = tf.random_uniform([BATCH_SIZE, Z_DIM])
+z = 2 * tf.random_uniform([BATCH_SIZE, Z_DIM]) - 1
 
 # Discriminator output for real images.
 d_real, d_real_logits, _ = discriminator(images)
@@ -139,17 +140,20 @@ with tf.Session() as sess:
     counter = tf.train.global_step(sess, global_step)
     start_time = time.time()
     sample_directory = 'generated_images/cifar/{}'.format(start_time)
+    if not os.path.exists(sample_directory):
+        os.makedirs(sample_directory)
 
     gl = None
+    gen_image = None
     start_step = int(counter) + 1
     for step in range(start_step, TRAINING_STEPS + 1):
         # Update the discriminator network.
         _, dl = sess.run([d_optim, d_loss])
 
         # Update the generator network.
-        if (counter - 1) % DISC_ITERS == 0 or g_loss is None:
+        if (step - 1) % DISC_ITERS == 0 or gl is None:
             _, gl, gen_image = sess.run([g_optim, g_loss, generated])
-
+        
         sess.run(global_step_inc)
         print_progress(step, start_step, start_time, dl, gl)
         maybe_save_samples(step, gen_image, sample_directory)

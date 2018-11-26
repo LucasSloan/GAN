@@ -27,7 +27,7 @@ def load_images_and_labels(batch_size, data_dir):
 
     dataset = tf.data.Dataset.zip((image_dataset, label_dataset, index_dataset))
 
-    dataset = dataset.batch(batch_size)
+    dataset = dataset.batch(batch_size, drop_remainder=True)
     # dataset = dataset.cache()
     dataset = dataset.repeat()
     # dataset = dataset.apply(tf.contrib.data.shuffle_and_repeat(10000))

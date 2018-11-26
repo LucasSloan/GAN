@@ -342,7 +342,7 @@ def resnet_cifar_generator(noise,
     output = ops.conv2d(
         output, output_dim=colors, k_h=3, k_w=3, d_h=1, d_w=1,
         name="final_conv")
-    output = tf.nn.sigmoid(output)
+    output = tf.nn.tanh(output)
 
     print ("Generator output shape: ", output)
     return output
