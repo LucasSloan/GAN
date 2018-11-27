@@ -8,6 +8,7 @@ import consts
 import resnet_architecture
 import cifar_loader
 import save_images
+import cifar_models
 
 IS_TRAINING = True
 BATCH_SIZE = 64
@@ -40,6 +41,10 @@ def discriminator(x, reuse=False, architecture=consts.RESNET_CIFAR, discriminato
     elif architecture == consts.RESNET_CIFAR:
         return resnet_architecture.resnet_cifar_discriminator(
             x, IS_TRAINING, discriminator_normalization, reuse)
+    elif architecture == "cifar_conv":
+        return cifar_models.conv_discriminator(x, reuse=reuse)
+    elif architecture == "cifar_resnet":
+        return cifar_models.resnet_discriminator(x, reuse=reuse)
     else:
         raise NotImplementedError(
             "Architecture %s not implemented." % architecture)
@@ -60,6 +65,10 @@ def generator(z, reuse=False, architecture=consts.RESNET_CIFAR):
     elif architecture == consts.RESNET_CIFAR:
         return resnet_architecture.resnet_cifar_generator(
             z, is_training=IS_TRAINING, reuse=reuse, colors=3)
+    elif architecture == "cifar_conv":
+        return cifar_models.conv_generator(z)
+    elif architecture == "cifar_resnet":
+        return cifar_models.resnet_generator(z)
     else:
         raise NotImplementedError(
             "Architecture %s not implemented." % architecture)
@@ -99,11 +108,11 @@ images.set_shape([BATCH_SIZE, 32, 32, 3])
 z = 2 * tf.random_uniform([BATCH_SIZE, Z_DIM]) - 1
 
 # Discriminator output for real images.
-d_real, d_real_logits, _ = discriminator(images)
+d_real, d_real_logits, _ = discriminator(images, architecture="cifar_conv")
 
 # Discriminator output for fake images.
-generated = generator(z)
-d_fake, d_fake_logits, _ = discriminator(generated, reuse=True)
+generated = generator(z, architecture=consts.RESNET_CIFAR)
+d_fake, d_fake_logits, _ = discriminator(generated, reuse=True, architecture="cifar_conv")
 
 # Define the loss functions
 d_loss_real = tf.reduce_mean(
