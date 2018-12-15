@@ -3,18 +3,35 @@ import tensorflow as tf
 import resnet_architecture
 import ops
 
-def generator_residual_block(input, channels, upsample):
-    shortcut = input
-    strides = (1, 1)
-    if upsample:
-        strides = (2, 2)
-        shortcut = tf.layers.conv2d_transpose(shortcut, channels, (1, 1), strides=strides, padding="same")
+# def generator_residual_block(input, channels, upsample):
+#     shortcut = input
+#     strides = (1, 1)
+#     if upsample:
+#         strides = (2, 2)
+#         shortcut = tf.layers.conv2d_transpose(shortcut, channels, (1, 1), strides=strides, padding="same")
 
-    conv1 = tf.layers.conv2d_transpose(input, channels, (3, 3), strides=strides, padding="same")
+#     conv1 = tf.layers.conv2d_transpose(input, channels, (3, 3), strides=strides, padding="same")
+#     conv1 = tf.layers.batch_normalization(conv1, training=True)
+#     conv1 = tf.nn.leaky_relu(conv1)
+
+#     conv2 = tf.layers.conv2d(conv1, channels, (3,3), strides=(1, 1), padding="same")
+#     conv2 = tf.layers.batch_normalization(conv2, training=True)
+
+#     conv2 += shortcut
+#     output = tf.nn.leaky_relu(conv2)
+
+#     return output
+
+def generator_residual_block(input, channels, upsample, name):
+    shortcut = input
+    if upsample:
+        shortcut = resnet_architecture.get_conv(shortcut, 0, channels, "up", name + "_shortcut", False)
+
+    conv1 = resnet_architecture.get_conv(input, 0, channels, "up", name + "_conv1", False)
     conv1 = tf.layers.batch_normalization(conv1, training=True)
     conv1 = tf.nn.leaky_relu(conv1)
 
-    conv2 = tf.layers.conv2d(conv1, channels, (3,3), strides=(1, 1), padding="same")
+    conv2 = resnet_architecture.get_conv(shortcut, 0, channels, "none", name + "_conv2", False)
     conv2 = tf.layers.batch_normalization(conv2, training=True)
 
     conv2 += shortcut
@@ -50,11 +67,11 @@ def resnet_generator(z):
         f2 = tf.reshape(f2, [-1, 4, 4, 128])
         f2 = tf.layers.batch_normalization(f2, training=True)
 
-        res1_1 = generator_residual_block(f2, 32, True)
-        res1_2 = generator_residual_block(res1_1, 32, False)
+        res1_1 = generator_residual_block(f2, 32, True, "res1_1")
+        res1_2 = generator_residual_block(res1_1, 32, False, "res1_2")
 
-        res2_1 = generator_residual_block(res1_2, 16, True)
-        res2_2 = generator_residual_block(res2_1, 16, False)
+        res2_1 = generator_residual_block(res1_2, 16, True, "res2_1")
+        res2_2 = generator_residual_block(res2_1, 16, False, "res2_2")
 
         conv = tf.layers.conv2d_transpose(res2_2, 3, (3, 3), strides=(2, 2), padding="same", activation=tf.nn.tanh)
 
