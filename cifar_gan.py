@@ -170,32 +170,44 @@ def discriminator(x):
         f2 = tf.nn.sigmoid(ops.linear(res2_flat, 1, scope="f2", use_sn=USE_SN))
         return f2
 
-with tf.variable_scope('G'):
-    z = tf.random_uniform([100, 100])
-    G = generator(z)
-
-image_summary = tf.summary.image("generated image", G, 10)
-
 images_and_labels = load_images_and_labels(100).get_next()
 x = images_and_labels[0]
 x.set_shape([100, 32, 32, 3])
-yx = images_and_labels[1]
-x_indices = images_and_labels[2]
-yg = tf.reshape(tf.tile(tf.one_hot(10, 11), [100]), [100, 11])
+# yx = images_and_labels[1]
+# x_indices = images_and_labels[2]
+# yg = tf.reshape(tf.tile(tf.one_hot(10, 11), [100]), [100, 11])
+
+z = 2 * tf.random_uniform([100, 100]) - 1
 
 with tf.variable_scope('D'):
-    # Dx, _, _ = resnet_architecture.resnet_cifar_discriminator(x, True, consts.SPECTRAL_NORM, reuse=False)
-    # Dg, _, _ = resnet_architecture.resnet_cifar_discriminator(G, True, consts.SPECTRAL_NORM, reuse=True)
-    Dx = discriminator(x)
-with tf.variable_scope('D', reuse=True):
-    Dg = discriminator(G)
+    Dx, Dx_logits, _ = resnet_architecture.resnet_cifar_discriminator(x, True, consts.SPECTRAL_NORM, reuse=False)
+
+with tf.variable_scope('G'):
+    # G = generator(z)
+    G = resnet_architecture.resnet_cifar_generator(z, True)
+
+image_summary = tf.summary.image("generated image", G, 10)
+
+with tf.variable_scope('D'):
+    Dg, Dg_logits, _ = resnet_architecture.resnet_cifar_discriminator(G, True, consts.SPECTRAL_NORM, reuse=True)
+#     Dx = discriminator(x)
+# with tf.variable_scope('D', reuse=True):
+#     Dg = discriminator(G)
 
 if LABEL_BASED_DISCRIMINATOR:
     loss_d = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=yx, logits=Dx) + tf.nn.softmax_cross_entropy_with_logits(labels=yg, logits=Dg)) #This optimizes the discriminator.
     loss_g = -tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=yg, logits=Dg)) #This optimizes the generator.
 else:
-    loss_d = -tf.reduce_mean(tf.log(Dx) + tf.log(1.-Dg)) #This optimizes the discriminator.
-    loss_g = -tf.reduce_mean(tf.log(Dg)) #This optimizes the generator.
+    d_loss_real = tf.reduce_mean(
+        tf.nn.sigmoid_cross_entropy_with_logits(
+            logits=Dx_logits, labels=tf.ones_like(Dx)))
+    d_loss_fake = tf.reduce_mean(
+        tf.nn.sigmoid_cross_entropy_with_logits(
+            logits=Dg_logits, labels=tf.zeros_like(Dg)))
+    loss_d = d_loss_real + d_loss_fake
+    loss_g = tf.reduce_mean(
+        tf.nn.sigmoid_cross_entropy_with_logits(
+            logits=Dg_logits, labels=tf.ones_like(Dg)))
 loss_d_summary = tf.summary.scalar("discriminator loss", loss_d)
 loss_g_summary = tf.summary.scalar("generator loss", loss_g)
 
@@ -252,13 +264,12 @@ with tf.Session() as session:
     g_epoch_losses = []
     for step in range(1, 200001):
         # update discriminator
-        for i in range(5):
-            summary, d_batch_loss, _ = session.run([loss_d_summary, loss_d, d_opt])
-            d_epoch_losses.append(d_batch_loss)
-            writer.add_summary(summary, step)
+        summary, d_batch_loss, _ = session.run([loss_d_summary, loss_d, d_opt])
+        d_epoch_losses.append(d_batch_loss)
+        writer.add_summary(summary, step)
 
         # update generator
-        for i in range(1):
+        if (step - 1) % 5 == 0:
             summary, g_batch_loss, _ = session.run([loss_g_summary, loss_g, g_opt])
             g_epoch_losses.append(g_batch_loss)
             writer.add_summary(summary, step)
