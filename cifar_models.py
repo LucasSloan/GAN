@@ -2,6 +2,7 @@ import tensorflow as tf
 
 import resnet_architecture
 import ops
+import consts
 
 # def generator_residual_block(input, channels, upsample):
 #     shortcut = input
@@ -23,21 +24,30 @@ import ops
 #     return output
 
 def generator_residual_block(input, channels, upsample, name):
-    shortcut = input
+    scale = "none"
     if upsample:
-        shortcut = resnet_architecture.get_conv(shortcut, 0, channels, "up", name + "_shortcut", False)
+        scale = "up"
+    return resnet_architecture.generator_block(input, in_channels=0,
+                               out_channels=channels,
+                               scale=scale, block_scope=name,
+                               is_training=True, reuse=False)
 
-    conv1 = resnet_architecture.get_conv(input, 0, channels, "up", name + "_conv1", False)
-    conv1 = tf.layers.batch_normalization(conv1, training=True)
-    conv1 = tf.nn.leaky_relu(conv1)
 
-    conv2 = resnet_architecture.get_conv(shortcut, 0, channels, "none", name + "_conv2", False)
-    conv2 = tf.layers.batch_normalization(conv2, training=True)
+    # shortcut = input
+    # if upsample:
+    #     shortcut = resnet_architecture.get_conv(shortcut, 0, channels, "up", name + "_shortcut", False)
 
-    conv2 += shortcut
-    output = tf.nn.leaky_relu(conv2)
+    # conv1 = resnet_architecture.get_conv(input, 0, channels, "up", name + "_conv1", False)
+    # conv1 = tf.layers.batch_normalization(conv1, training=True)
+    # conv1 = tf.nn.leaky_relu(conv1)
 
-    return output
+    # conv2 = resnet_architecture.get_conv(shortcut, 0, channels, "none", name + "_conv2", False)
+    # conv2 = tf.layers.batch_normalization(conv2, training=True)
+
+    # conv2 += shortcut
+    # output = tf.nn.leaky_relu(conv2)
+
+    # return output
 
 def conv_generator(z):
     with tf.variable_scope('generator'):
@@ -77,26 +87,38 @@ def resnet_generator(z):
 
         return conv
 
-def discriminator_residual_block(input, channels, downsample, name, use_sn=True):
-    shortcut = input
-    stride = 1
+def discriminator_residual_block(input, channels, downsample, name, use_sn=True, reuse=False):
+    scale = "none"
     if downsample:
-        stride = 2
-        shortcut = ops.conv2d(shortcut, channels, 1, 1, stride, stride, name=name + "_shortcut", use_sn=use_sn)
-        shortcut = tf.layers.batch_normalization(shortcut, training=True)
+        scale = "down"
+    discriminator_normalization = consts.NO_NORMALIZATION
+    if use_sn:
+        discriminator_normalization = consts.SPECTRAL_NORM
+    return resnet_architecture.discriminator_block(
+          input, in_channels=0, out_channels=channels,
+          scale=scale, block_scope=name,
+          is_training=True, reuse=reuse,
+          discriminator_normalization=discriminator_normalization)
+
+    # shortcut = input
+    # stride = 1
+    # if downsample:
+    #     stride = 2
+    #     shortcut = ops.conv2d(shortcut, channels, 1, 1, stride, stride, name=name + "_shortcut", use_sn=use_sn)
+    #     shortcut = tf.layers.batch_normalization(shortcut, training=True)
         
-    conv1 = ops.conv2d(input, channels, 3, 3, 1, 1, name=name + "_conv1", use_sn=use_sn)
-    conv1 = tf.layers.batch_normalization(conv1, training=True)
-    conv1 = tf.nn.leaky_relu(conv1)
+    # conv1 = ops.conv2d(input, channels, 3, 3, 1, 1, name=name + "_conv1", use_sn=use_sn)
+    # conv1 = tf.layers.batch_normalization(conv1, training=True)
+    # conv1 = tf.nn.leaky_relu(conv1)
 
-    conv2 = ops.conv2d(conv1, channels, 3, 3, stride, stride, name=name + "_conv2", use_sn=use_sn)
-    conv2 = tf.layers.batch_normalization(conv2, training=True)
+    # conv2 = ops.conv2d(conv1, channels, 3, 3, stride, stride, name=name + "_conv2", use_sn=use_sn)
+    # conv2 = tf.layers.batch_normalization(conv2, training=True)
 
 
-    conv2 += shortcut
-    output = tf.nn.leaky_relu(conv2)
+    # conv2 += shortcut
+    # output = tf.nn.leaky_relu(conv2)
 
-    return output
+    # return output
 
 def conv_discriminator(x, reuse=False, use_sn=True, label_based_discriminator=False):
     with tf.variable_scope('discriminator', reuse=reuse):
@@ -108,8 +130,9 @@ def conv_discriminator(x, reuse=False, use_sn=True, label_based_discriminator=Fa
         h_conv3_flat = tf.reshape(h_conv3, [-1, 4*4*128])
 
         if label_based_discriminator:
-            f1 = ops.linear(h_conv3_flat, 11, scope="f1", use_sn=use_sn)
-            return f1
+            f1_logit = ops.linear(h_conv3_flat, 11, scope="f1", use_sn=use_sn)
+            f1 = tf.nn.sigmoid(f1_logit)
+            return f1, f1_logit, None
         else:
             f1_logit = ops.linear(h_conv3_flat, 1, scope="f1", use_sn=use_sn)
             f1 = tf.nn.sigmoid(f1_logit)
@@ -119,25 +142,26 @@ def conv_discriminator(x, reuse=False, use_sn=True, label_based_discriminator=Fa
 def resnet_discriminator(x, reuse=False, use_sn=True, label_based_discriminator=False):
     with tf.variable_scope('discriminator', reuse=reuse):
         # 32x32x3 -> 16x16x16
-        res1_1 = discriminator_residual_block(x, 16, True, "res1_1", use_sn=use_sn)
-        res1_2 = discriminator_residual_block(res1_1, 16, False, "res1_2", use_sn=use_sn)
-        res1_3 = discriminator_residual_block(res1_2, 16, False, "res1_3", use_sn=use_sn)
+        res1_1 = discriminator_residual_block(x, 16, True, "res1_1", use_sn=use_sn, reuse=reuse)
+        res1_2 = discriminator_residual_block(res1_1, 16, False, "res1_2", use_sn=use_sn, reuse=reuse)
+        res1_3 = discriminator_residual_block(res1_2, 16, False, "res1_3", use_sn=use_sn, reuse=reuse)
 
         # 16x16x16 -> 8x8x32
-        res2_1 = discriminator_residual_block(res1_3, 32, True, "res2_1", use_sn=use_sn)
-        res2_2 = discriminator_residual_block(res2_1, 32, False, "res2_2", use_sn=use_sn)
-        res2_3 = discriminator_residual_block(res2_2, 32, False, "res2_3", use_sn=use_sn)
+        res2_1 = discriminator_residual_block(res1_3, 32, True, "res2_1", use_sn=use_sn, reuse=reuse)
+        res2_2 = discriminator_residual_block(res2_1, 32, False, "res2_2", use_sn=use_sn, reuse=reuse)
+        res2_3 = discriminator_residual_block(res2_2, 32, False, "res2_3", use_sn=use_sn, reuse=reuse)
 
         # 8x8x32 -> 4x4x64
-        res3_1 = discriminator_residual_block(res2_3, 64, True, "res3_1", use_sn=use_sn)
-        res3_2 = discriminator_residual_block(res3_1, 64, False, "res3_2", use_sn=use_sn)
-        res3_3 = discriminator_residual_block(res3_2, 64, False, "res3_3", use_sn=use_sn)
+        res3_1 = discriminator_residual_block(res2_3, 64, True, "res3_1", use_sn=use_sn, reuse=reuse)
+        res3_2 = discriminator_residual_block(res3_1, 64, False, "res3_2", use_sn=use_sn, reuse=reuse)
+        res3_3 = discriminator_residual_block(res3_2, 64, False, "res3_3", use_sn=use_sn, reuse=reuse)
 
         res3_flat = tf.reshape(res3_3, [-1, 4*4*64])
 
         if label_based_discriminator:
-            f1 = ops.linear(res3_flat, 11, scope="f1", use_sn=use_sn)
-            return f1
+            f1_logit = ops.linear(res3_flat, 11, scope="f1", use_sn=use_sn)
+            f1 = tf.nn.sigmoid(f1_logit)
+            return f1, f1_logit, None
         else:
             f1_logit = ops.linear(res3_flat, 1, scope="f1", use_sn=use_sn)
             f1 = tf.nn.sigmoid(f1_logit)

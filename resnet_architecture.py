@@ -85,8 +85,8 @@ def unpool(value, name="unpool"):
 
 def get_conv(inputs, in_channels, out_channels, scale, suffix, use_sn):
   """Return convolution for the resnet block."""
-  if inputs.get_shape().as_list()[-1] != in_channels:
-    raise ValueError("Unexpected number of input channels.")
+  # if inputs.get_shape().as_list()[-1] != in_channels:
+  #   raise ValueError("Unexpected number of input channels.")
 
   if scale == "up":
     output = unpool(inputs)
@@ -112,8 +112,8 @@ def resnet_block(inputs, in_channels, out_channels, scale,
                  block_scope, is_training, reuse, discriminator_normalization,
                  is_gen_block):
   assert scale in ["up", "down", "none"]
-  if inputs.get_shape().as_list()[-1] != in_channels:
-    raise ValueError("Unexpected number of input channels.")
+  # if inputs.get_shape().as_list()[-1] != in_channels:
+  #   raise ValueError("Unexpected number of input channels.")
 
   # In SN paper, if they upscale in generator they do this in the first conv.
   # For discriminator downsampling happens after second conv.
@@ -377,7 +377,7 @@ def resnet_cifar_discriminator(inputs,
     pre_logits = tf.reduce_mean(output, axis=[1, 2])
     # dense -> 1
     use_sn = discriminator_normalization == consts.SPECTRAL_NORM
-    out_logit = ops.linear(pre_logits, 1, scope="disc_final_fc", use_sn=use_sn)
+    out_logit = ops.linear(pre_logits, 11, scope="disc_final_fc", use_sn=use_sn)
     out = tf.nn.sigmoid(out_logit)
     return out, out_logit, None
 

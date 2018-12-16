@@ -12,6 +12,7 @@ import custom_layers
 import ops
 import resnet_architecture
 import consts
+import cifar_models
 
 # Constants
 CIFAR_CATEGORIES = ["airplane", "automobile", "bird", "cat", "deer", "dog", "frog", "horse", "ship", "truck"]
@@ -180,16 +181,19 @@ yg = tf.reshape(tf.tile(tf.one_hot(10, 11), [100]), [100, 11])
 z = 2 * tf.random_uniform([100, 100]) - 1
 
 with tf.variable_scope('D'):
-    Dx, Dx_logits, _ = resnet_architecture.resnet_cifar_discriminator(x, True, consts.SPECTRAL_NORM, reuse=False)
+    Dx, Dx_logits, _ = cifar_models.resnet_discriminator(x, reuse=False, use_sn=USE_SN, label_based_discriminator=LABEL_BASED_DISCRIMINATOR)
+    # Dx, Dx_logits, _ = resnet_architecture.resnet_cifar_discriminator(x, True, consts.SPECTRAL_NORM, reuse=False)
 
 with tf.variable_scope('G'):
     # G = generator(z)
-    G = resnet_architecture.resnet_cifar_generator(z, True)
+    # G = resnet_architecture.resnet_cifar_generator(z, True)
+    G = cifar_models.resnet_generator(z)
 
 image_summary = tf.summary.image("generated image", G, 10)
 
 with tf.variable_scope('D'):
-    Dg, Dg_logits, _ = resnet_architecture.resnet_cifar_discriminator(G, True, consts.SPECTRAL_NORM, reuse=True)
+    Dg, Dg_logits, _ = cifar_models.resnet_discriminator(G,  reuse=True, use_sn=USE_SN, label_based_discriminator=LABEL_BASED_DISCRIMINATOR)
+    # Dg, Dg_logits, _ = resnet_architecture.resnet_cifar_discriminator(G, True, consts.SPECTRAL_NORM, reuse=True)
 #     Dx = discriminator(x)
 # with tf.variable_scope('D', reuse=True):
 #     Dg = discriminator(G)
