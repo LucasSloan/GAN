@@ -16,7 +16,7 @@ import consts
 # Constants
 CIFAR_CATEGORIES = ["airplane", "automobile", "bird", "cat", "deer", "dog", "frog", "horse", "ship", "truck"]
 USE_SN = True
-LABEL_BASED_DISCRIMINATOR = False
+LABEL_BASED_DISCRIMINATOR = True
 OUTPUT_REAL_IMAGES = False
 flags = tf.app.flags
 FLAGS = flags.FLAGS
@@ -173,9 +173,9 @@ def discriminator(x):
 images_and_labels = load_images_and_labels(100).get_next()
 x = images_and_labels[0]
 x.set_shape([100, 32, 32, 3])
-# yx = images_and_labels[1]
-# x_indices = images_and_labels[2]
-# yg = tf.reshape(tf.tile(tf.one_hot(10, 11), [100]), [100, 11])
+yx = images_and_labels[1]
+x_indices = images_and_labels[2]
+yg = tf.reshape(tf.tile(tf.one_hot(10, 11), [100]), [100, 11])
 
 z = 2 * tf.random_uniform([100, 100]) - 1
 
@@ -195,8 +195,16 @@ with tf.variable_scope('D'):
 #     Dg = discriminator(G)
 
 if LABEL_BASED_DISCRIMINATOR:
-    loss_d = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=yx, logits=Dx) + tf.nn.softmax_cross_entropy_with_logits(labels=yg, logits=Dg)) #This optimizes the discriminator.
-    loss_g = -tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=yg, logits=Dg)) #This optimizes the generator.
+    d_loss_real = tf.reduce_mean(
+        tf.nn.sigmoid_cross_entropy_with_logits(
+            logits=Dx_logits, labels=yx))
+    d_loss_fake = tf.reduce_mean(
+        tf.nn.sigmoid_cross_entropy_with_logits(
+            logits=Dg_logits, labels=yg))
+    loss_d = d_loss_real + d_loss_fake
+    loss_g = -tf.reduce_mean(
+        tf.nn.sigmoid_cross_entropy_with_logits(
+            logits=Dg_logits, labels=yg))
 else:
     d_loss_real = tf.reduce_mean(
         tf.nn.sigmoid_cross_entropy_with_logits(
@@ -224,8 +232,9 @@ for v in vars:
 d_params = [v for v in vars if v.name.startswith('D/')]
 g_params = [v for v in vars if v.name.startswith('G/')]
 
-d_opt = tf.train.AdamOptimizer(1e-4).minimize(loss_d, var_list=d_params)
-g_opt = tf.train.AdamOptimizer(1e-4).minimize(loss_g, var_list=g_params)
+# with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
+d_opt = tf.train.AdamOptimizer(1e-4, beta1=0.5, beta2=0.999).minimize(loss_d, var_list=d_params)
+g_opt = tf.train.AdamOptimizer(1e-4, beta1=0.5, beta2=0.999).minimize(loss_g, var_list=g_params)
 
 d_saver = tf.train.Saver(d_params)
 g_saver = tf.train.Saver(g_params)
@@ -293,16 +302,16 @@ with tf.Session() as session:
             summary, gen_image, discriminator_confidence = session.run([image_summary, G, Dg])
             save_images.save_images(np.reshape(gen_image, [100, 32, 32, 3]), [10, 10], sample_directory + '/{}gen.png'.format(step))
             writer.add_summary(summary, step)
-            min_discriminator_confidence = np.min(discriminator_confidence)
-            max_discriminator_confidence = np.max(discriminator_confidence)
-            print("minimum discriminator confidence: {:.4f} maximum discriminator confidence: {:.4f}\n".format(min_discriminator_confidence, max_discriminator_confidence))
-            min_confidence_index = np.argmin(discriminator_confidence)
-            max_confidence_index = np.argmax(discriminator_confidence)
-            min_max_image = np.ndarray([2, 32, 32, 3])
-            min_max_image[0] = gen_image[min_confidence_index]
-            min_max_image[1] = gen_image[max_confidence_index]
-            print("minimum confidence index: {} maximum confidence index: {}".format(min_confidence_index, max_confidence_index))
-            save_images.save_images(min_max_image, [2, 1], sample_directory + '/{}gen_min_max.png'.format(step))
+            # min_discriminator_confidence = np.min(discriminator_confidence)
+            # max_discriminator_confidence = np.max(discriminator_confidence)
+            # print("minimum discriminator confidence: {:.4f} maximum discriminator confidence: {:.4f}\n".format(min_discriminator_confidence, max_discriminator_confidence))
+            # min_confidence_index = np.argmin(discriminator_confidence)
+            # max_confidence_index = np.argmax(discriminator_confidence)
+            # min_max_image = np.ndarray([2, 32, 32, 3])
+            # min_max_image[0] = gen_image[min_confidence_index]
+            # min_max_image[1] = gen_image[max_confidence_index]
+            # print("minimum confidence index: {} maximum confidence index: {}".format(min_confidence_index, max_confidence_index))
+            # save_images.save_images(min_max_image, [2, 1], sample_directory + '/{}gen_min_max.png'.format(step))
 
         if step % 1000 == 0 and OUTPUT_REAL_IMAGES:
             real_image, real_labels = session.run([x, x_indices])
