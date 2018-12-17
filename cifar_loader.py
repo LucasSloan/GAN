@@ -5,7 +5,6 @@ def parse_images(filename):
   image_decoded = tf.image.decode_png(image_string, channels=3)
   image_flipped = tf.image.random_flip_left_right(image_decoded)
   image_normalized = 2.0 * tf.image.convert_image_dtype(image_flipped, tf.float32) - 1.0
-  image_normalized.set_shape([32, 32, 3])
   return image_normalized
 
 def text_to_index(text_label):
@@ -27,7 +26,7 @@ def load_images_and_labels(batch_size, data_dir):
 
     dataset = tf.data.Dataset.zip((image_dataset, label_dataset, index_dataset))
 
-    dataset = dataset.batch(batch_size, drop_remainder=True)
+    dataset = dataset.batch(batch_size)
     # dataset = dataset.cache()
     dataset = dataset.repeat()
     # dataset = dataset.apply(tf.contrib.data.shuffle_and_repeat(10000))
