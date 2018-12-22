@@ -35,16 +35,16 @@ yg = tf.reshape(tf.tile(tf.one_hot(10, 11), [100]), [100, 11])
 z = 2 * tf.random_uniform([100, 100]) - 1
 
 with tf.variable_scope('D'):
-    # Dx, Dx_logits, _ = cifar_models.resnet_discriminator(x, reuse=False, use_sn=USE_SN, label_based_discriminator=LABEL_BASED_DISCRIMINATOR)
-    Dx, Dx_logits, _ = resnet_architecture.resnet_cifar_discriminator(x, True, consts.SPECTRAL_NORM, reuse=False)
+    Dx, Dx_logits, _ = cifar_models.resnet_discriminator(x, reuse=False, use_sn=USE_SN, label_based_discriminator=LABEL_BASED_DISCRIMINATOR)
+    # Dx, Dx_logits, _ = resnet_architecture.resnet_cifar_discriminator(x, True, consts.SPECTRAL_NORM, reuse=False)
 
 with tf.variable_scope('G'):
-    # G = cifar_models.resnet_generator(z)
-    G = resnet_architecture.resnet_cifar_generator(z, True)
+    G = cifar_models.resnet_generator(z)
+    # G = resnet_architecture.resnet_cifar_generator(z, True)
 
 with tf.variable_scope('D'):
-    # Dg, Dg_logits, _ = cifar_models.resnet_discriminator(G,  reuse=True, use_sn=USE_SN, label_based_discriminator=LABEL_BASED_DISCRIMINATOR)
-    Dg, Dg_logits, _ = resnet_architecture.resnet_cifar_discriminator(G, True, consts.SPECTRAL_NORM, reuse=True)
+    Dg, Dg_logits, _ = cifar_models.resnet_discriminator(G,  reuse=True, use_sn=USE_SN, label_based_discriminator=LABEL_BASED_DISCRIMINATOR)
+    # Dg, Dg_logits, _ = resnet_architecture.resnet_cifar_discriminator(G, True, consts.SPECTRAL_NORM, reuse=True)
 
 if LABEL_BASED_DISCRIMINATOR:
     d_loss_real = tf.reduce_mean(
@@ -99,7 +99,7 @@ with tf.Session() as session:
     previous_step_time = time.time()
     d_epoch_losses = []
     g_epoch_losses = []
-    for step in range(1, 40001):
+    for step in range(1, 200001):
         # update discriminator
         d_batch_loss, _ = session.run([loss_d, d_opt])
         d_epoch_losses.append(d_batch_loss)
