@@ -1,24 +1,19 @@
 import tensorflow as tf
-import numpy as np
-import imageio
-import time
-import save_images
-import custom_layers
-import os
-import ops
 
-BATCH_SIZE = 100
+from gan import GAN
+import resnet_blocks
+import ops
 
 def parse_images(filename):
   image_string = tf.read_file(filename)
   image_decoded = tf.image.decode_png(image_string, channels=3)
   image_normalized = 2.0 * tf.image.convert_image_dtype(image_decoded, tf.float32) - 1.0
-# image_resized = tf.image.resize_images(image_normalized, [32, 32])
-# image_flipped = tf.image.flip_left_right(image_normalized)
-  return image_normalized
+  image_resized = tf.image.resize_images(image_normalized, [64, 64])
+  # image_flipped = tf.image.flip_left_right(image_normalized)
+  return image_resized
 
-def load_images(batch_size):
-    image_files_dataset = tf.data.Dataset.list_files("E:\\LSUN\\train64x64\\*")
+def load_lsun(batch_size):
+    image_files_dataset = tf.data.Dataset.list_files("E:\\LSUN\\train1000\\*")
     image_dataset = image_files_dataset.map(parse_images, num_parallel_calls=8)
     # image_dataset = image_dataset.cache()
     
@@ -28,92 +23,71 @@ def load_images(batch_size):
     dataset = dataset.prefetch(batch_size)
     return dataset.make_one_shot_iterator()
 
-def generator(z, training):
-    f1 = tf.layers.dense(z, 1024, tf.nn.leaky_relu)
-    f1 = tf.layers.batch_normalization(f1, training=training)
+def resnet_generator(z):
+    with tf.variable_scope('generator'):
+        f1 = tf.layers.dense(z, 1024, tf.nn.leaky_relu)
+        f1 = tf.layers.batch_normalization(f1, training=True)
 
-    f2 = tf.layers.dense(f1, 8 * 8 * 64, tf.nn.leaky_relu)
-    f2 = tf.reshape(f2, [-1, 8, 8, 64])
-    f2 = tf.layers.batch_normalization(f2, training=training)
+        f2 = tf.layers.dense(f1, 4*4*128, tf.nn.leaky_relu)
+        f2 = tf.reshape(f2, [-1, 4, 4, 128])
+        f2 = tf.layers.batch_normalization(f2, training=True)
 
-    conv1 = tf.layers.conv2d_transpose(f2, 32, [5, 5], strides=(2, 2), padding="same", activation=tf.nn.leaky_relu)
-    conv1 = tf.layers.batch_normalization(conv1, training=training)
+        res1_1 = resnet_blocks.generator_residual_block(f2, 128, True, "res1_1")
+        res1_2 = resnet_blocks.generator_residual_block(res1_1, 128, True, "res1_2")
 
-    conv2 = tf.layers.conv2d_transpose(conv1, 16, [5, 5], strides=(2, 2), padding="same", activation=tf.nn.leaky_relu)
-    conv2 = tf.layers.batch_normalization(conv2, training=training)
+        res2_1 = resnet_blocks.generator_residual_block(res1_2, 128, True, "res2_1")
+        res2_2 = resnet_blocks.generator_residual_block(res2_1, 128, False, "res2_2")
 
-    conv3 = tf.layers.conv2d_transpose(conv2, 3, [5, 5], strides=(2, 2), padding="same", activation=tf.nn.tanh)
+        conv = tf.layers.conv2d_transpose(res2_2, 3, (3, 3), strides=(2, 2), padding="same", activation=tf.nn.tanh)
 
-    return conv3
-
-def discriminator(x, training):
-    h_conv1 = tf.nn.leaky_relu(ops.conv2d(x, 16, 5, 5, 2, 2, name="h_conv1", use_sn=True))
-
-    h_conv2 = tf.nn.leaky_relu(ops.conv2d(h_conv1, 32, 5, 5, 2, 2, name="h_conv2", use_sn=True))
-
-    h_conv3 = tf.nn.leaky_relu(ops.conv2d(h_conv2, 64, 5, 5, 2, 2, name="h_conv3", use_sn=True))
-    h_conv3_flat = tf.reshape(h_conv3, [-1, 8*8*64])
-
-    f1 = tf.nn.leaky_relu(ops.linear(h_conv3_flat, 1024, scope="f1", use_sn=True))
-
-    f2 = tf.nn.sigmoid(ops.linear(f1, 1, scope="f2", use_sn=True))
-
-    return f2
-
-training = tf.placeholder(tf.bool)
-
-with tf.variable_scope('G'):
-    z = tf.random_uniform([BATCH_SIZE, 100])
-    G = generator(z, training)
-
-x = load_images(BATCH_SIZE).get_next()
-x.set_shape([BATCH_SIZE, 64, 64, 3])
-with tf.variable_scope('D'):
-    Dx = discriminator(x, training)
-with tf.variable_scope('D', reuse=True):
-    Dg = discriminator(G, training)
-
-loss_d = -tf.reduce_mean(tf.log(Dx) + tf.log(1.-Dg)) #This optimizes the discriminator.
-loss_g = -tf.reduce_mean(tf.log(Dg)) #This optimizes the generator.
+        return conv
 
 
-vars = tf.trainable_variables()
-for v in vars:
-    print(v.name)
-d_params = [v for v in vars if v.name.startswith('D/')]
-g_params = [v for v in vars if v.name.startswith('G/')]
 
-d_opt = tf.train.AdamOptimizer(1e-4).minimize(loss_d, var_list=d_params)
-g_opt = tf.train.AdamOptimizer(1e-4).minimize(loss_g, var_list=g_params)
+def resnet_discriminator(x, reuse=False, use_sn=True, label_based_discriminator=False):
+    with tf.variable_scope('discriminator', reuse=reuse):
+        # 32x32x3 -> 16x16x32
+        res1_1 = resnet_blocks.discriminator_residual_block(x, 128, True, "res1_1", use_sn=use_sn, reuse=reuse)
+        # res1_2 = resnet_blocks.discriminator_residual_block(res1_1, 128, False, "res1_2", use_sn=use_sn, reuse=reuse)
+        # res1_3 = resnet_blocks.discriminator_residual_block(res1_2, 128, False, "res1_3", use_sn=use_sn, reuse=reuse)
 
-with tf.Session() as session:
-    tf.local_variables_initializer().run()
-    tf.global_variables_initializer().run()
+        # 16x16x32 -> 8x8x64
+        res2_1 = resnet_blocks.discriminator_residual_block(res1_1, 128, True, "res2_1", use_sn=use_sn, reuse=reuse)
+        res2_2 = resnet_blocks.discriminator_residual_block(res2_1, 128, True, "res2_2", use_sn=use_sn, reuse=reuse)
+        res2_3 = resnet_blocks.discriminator_residual_block(res2_2, 128, False, "res2_3", use_sn=use_sn, reuse=reuse)
 
-    previous_step_time = time.time()
-    start_time = time.time()
-    sample_directory = 'generated_images/lsun/{}'.format(start_time)
-    for step in range(1, 100001):
-        # update discriminator
-        for _ in range(5):
-            loss_d_thingy, _ = session.run([loss_d, d_opt], {training: True})
+        # 8x8x64 -> 4x4x128
+        # res3_1 = resnet_blocks.discriminator_residual_block(res2_3, 128, True, "res3_1", use_sn=use_sn, reuse=reuse)
+        # res3_2 = resnet_blocks.discriminator_residual_block(res3_1, 128, False, "res3_2", use_sn=use_sn, reuse=reuse)
+        # res3_3 = resnet_blocks.discriminator_residual_block(res3_2, 128, False, "res3_3", use_sn=use_sn, reuse=reuse)
 
-        # update generator
-        for _ in range(1):
-            loss_g_thingy, _ = session.run([loss_g, g_opt], {training: True})
+        res3_flat = tf.reshape(res2_3, [-1, 8*8*128])
 
-        if step % 100 == 0:
-            print('{}: discriminator loss {:.8f}\tgenerator loss {:.8f}'.format(step, loss_d_thingy, loss_g_thingy))
+        if label_based_discriminator:
+            f1_logit = ops.linear(res3_flat, 11, scope="f1", use_sn=use_sn)
+            f1 = tf.nn.sigmoid(f1_logit)
+            return f1, f1_logit, None
+        else:
+            f1_logit = ops.linear(res3_flat, 1, scope="f1", use_sn=use_sn)
+            f1 = tf.nn.sigmoid(f1_logit)
+            return f1, f1_logit, None
 
-        if step % 100 == 0:
-            current_step_time = time.time()
-            print('{}: previous 100 steps took {:.4f}s'.format(step, current_step_time - previous_step_time))
-            previous_step_time = current_step_time
 
-        if step % 1000 == 0:
-            gen_image = session.run(G, {training: True})
-            real_image = session.run(x, {training: True})
-            if not os.path.exists(sample_directory):
-                os.makedirs(sample_directory)
-            save_images.save_images(np.reshape(gen_image, [BATCH_SIZE, 64, 64, 3]), [10, 10], sample_directory + '/{}gen.png'.format(step))
-            save_images.save_images(np.reshape(real_image, [BATCH_SIZE, 64, 64, 3]), [10, 10], sample_directory + '/{}real.png'.format(step))
+class LSUN_GAN(GAN):
+    def __init__(self, training_steps, batch_size, label_based_discriminator, output_real_images = False):
+        super().__init__(64, 64, "lsun", training_steps, batch_size, label_based_discriminator, output_real_images = False)
+
+    def generator(self, z):
+        return resnet_generator(z)
+
+    def discriminator(self, x, label_based_discriminator):
+        Dx, Dx_logits, _ = resnet_discriminator(x, reuse=False, use_sn=True, label_based_discriminator=label_based_discriminator)
+        return Dx, Dx_logits
+
+    def load_data(self, batch_size):
+        x = load_lsun(batch_size).get_next()
+        x.set_shape([batch_size, 64, 64, 3])
+        return x, None, None
+
+g = LSUN_GAN(20000, 100, False)
+g.run()
