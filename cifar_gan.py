@@ -15,6 +15,9 @@ FLAGS = flags.FLAGS
 flags.DEFINE_string("data_dir", "/home/lucas/training_data/cifar10/", "Directory to read the training data from.")
 
 class CIFAR_GAN(GAN):
+    def __init__(self, training_steps, batch_size, label_based_discriminator, output_real_images = False):
+        super().__init__(32, 32, "cifar", training_steps, batch_size, label_based_discriminator, output_real_images = False)
+
     def generator(self, z):
         G = cifar_models.resnet_generator(z)
         # G = resnet_architecture.resnet_cifar_generator(z, True)

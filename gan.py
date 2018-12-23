@@ -5,26 +5,33 @@ import numpy as np
 import time
 import os
 import shutil
+import abc
 
 import save_images
 
-class GAN:
-    def __init__(self, training_steps, batch_size, label_based_discriminator, output_real_images = False):
+class GAN(abc.ABC):
+    def __init__(self, x, y, name, training_steps, batch_size, label_based_discriminator, output_real_images = False):
+        self.x = x
+        self.y = y
+        self.name = name
         self.training_steps = training_steps
         self.batch_size = batch_size
         self.label_based_discriminator = label_based_discriminator
         self.output_real_images = output_real_images
 
+    @abc.abstractmethod
     def generator(self, z):
         pass
 
+    @abc.abstractmethod
     def discriminator(self, x, label_based_discriminator):
         pass
 
+    @abc.abstractmethod
     def load_data(self, batch_size):
         pass
 
-    def losses(self, Dx_logits, Dg_logits, yx, yg):
+    def losses(self, Dx_logits, Dg_logits, Dx, Dg, yx, yg):
         if self.label_based_discriminator:
             d_loss_real = tf.reduce_mean(
                 tf.nn.sigmoid_cross_entropy_with_logits(
@@ -63,7 +70,7 @@ class GAN:
         with tf.variable_scope('D', reuse=True):
             Dg, Dg_logits = self.discriminator(G, self.label_based_discriminator)
 
-        loss_d, loss_g = self.losses(Dx_logits, Dg_logits, yx, yg)
+        loss_d, loss_g = self.losses(Dx_logits, Dg_logits, Dx, Dg, yx, yg)
 
         if self.label_based_discriminator:
             real_correct_prediction = tf.equal(tf.argmax(Dx, 1), tf.argmax(yx, 1))
@@ -83,7 +90,7 @@ class GAN:
             g_opt = tf.train.AdamOptimizer(1e-4, beta1=0.5, beta2=0.999).minimize(loss_g, var_list=g_params)
 
         start_time = time.time()
-        sample_directory = 'generated_images/cifar/{}'.format(start_time)
+        sample_directory = 'generated_images/{}/{}'.format(self.name, start_time)
         if not os.path.exists(sample_directory):
             os.makedirs(sample_directory)
         shutil.copy(os.path.abspath(__file__), sample_directory)
@@ -122,13 +129,13 @@ class GAN:
 
                 if step % 1000 == 0:
                     gen_image, discriminator_confidence = session.run([G, Dg])
-                    save_images.save_images(np.reshape(gen_image, [self.batch_size, 32, 32, 3]), [10, 10], sample_directory + '/{}gen.png'.format(step))
+                    save_images.save_images(np.reshape(gen_image, [self.batch_size, self.x, self.y, 3]), [10, 10], sample_directory + '/{}gen.png'.format(step))
                     # min_discriminator_confidence = np.min(discriminator_confidence)
                     # max_discriminator_confidence = np.max(discriminator_confidence)
                     # print("minimum discriminator confidence: {:.4f} maximum discriminator confidence: {:.4f}\n".format(min_discriminator_confidence, max_discriminator_confidence))
                     # min_confidence_index = np.argmin(discriminator_confidence)
                     # max_confidence_index = np.argmax(discriminator_confidence)
-                    # min_max_image = np.ndarray([2, 32, 32, 3])
+                    # min_max_image = np.ndarray([2, self.x, self.y, 3])
                     # min_max_image[0] = gen_image[min_confidence_index]
                     # min_max_image[1] = gen_image[max_confidence_index]
                     # print("minimum confidence index: {} maximum confidence index: {}".format(min_confidence_index, max_confidence_index))
@@ -136,4 +143,4 @@ class GAN:
 
                 if step % 1000 == 0 and self.output_real_images:
                     real_image = session.run(x)
-                    save_images.save_images(np.reshape(real_image, [self.batch_size, 32, 32, 3]), [10, 10], sample_directory + '/{}real.png'.format(step))
+                    save_images.save_images(np.reshape(real_image, [self.batch_size, self.x, self.y, 3]), [10, 10], sample_directory + '/{}real.png'.format(step))
