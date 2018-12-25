@@ -13,7 +13,7 @@ def parse_images(filename):
   return image_resized
 
 def load_lsun(batch_size):
-    image_files_dataset = tf.data.Dataset.list_files("E:\\LSUN\\train1000\\*")
+    image_files_dataset = tf.data.Dataset.list_files("/home/lucas/training_data/lsun/train64x64/*")
     image_dataset = image_files_dataset.map(parse_images, num_parallel_calls=8)
     # image_dataset = image_dataset.cache()
     
@@ -89,5 +89,5 @@ class LSUN_GAN(GAN):
         x.set_shape([batch_size, 64, 64, 3])
         return x, None, None
 
-g = LSUN_GAN(20000, 100, False)
+g = LSUN_GAN(200000, 100, False)
 g.run()
