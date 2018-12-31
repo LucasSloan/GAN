@@ -177,7 +177,7 @@ def generator_block(inputs, in_channels, out_channels, scale,
   assert scale in ["up", "none"]
   return resnet_block(inputs, in_channels, out_channels, scale,
                       block_scope, is_training, reuse,
-                      discriminator_normalization=consts.NO_NORMALIZATION,
+                      discriminator_normalization=consts.SPECTRAL_NORM,
                       is_gen_block=True)
 
 
