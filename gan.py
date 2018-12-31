@@ -9,8 +9,9 @@ import abc
 
 import save_images
 
+
 class GAN(abc.ABC):
-    def __init__(self, x, y, name, training_steps, batch_size, label_based_discriminator, output_real_images = False):
+    def __init__(self, x, y, name, training_steps, batch_size, label_based_discriminator, output_real_images=False):
         self.x = x
         self.y = y
         self.name = name
@@ -57,27 +58,32 @@ class GAN(abc.ABC):
 
         return loss_d, loss_g
 
-
     def run(self):
         x, yx, yg = self.load_data(self.batch_size)
 
         z = 2 * tf.random_uniform([self.batch_size, 100]) - 1
 
         with tf.variable_scope('D'):
-            Dx, Dx_logits = self.discriminator(x, self.label_based_discriminator)
+            Dx, Dx_logits = self.discriminator(
+                x, self.label_based_discriminator)
         with tf.variable_scope('G'):
             G = self.generator(z)
         with tf.variable_scope('D', reuse=True):
-            Dg, Dg_logits = self.discriminator(G, self.label_based_discriminator)
+            Dg, Dg_logits = self.discriminator(
+                G, self.label_based_discriminator)
 
         loss_d, loss_g = self.losses(Dx_logits, Dg_logits, Dx, Dg, yx, yg)
 
         if self.label_based_discriminator:
-            real_correct_prediction = tf.equal(tf.argmax(Dx, 1), tf.argmax(yx, 1))
-            real_accuracy = tf.reduce_mean(tf.cast(real_correct_prediction, tf.float32))
+            real_correct_prediction = tf.equal(
+                tf.argmax(Dx, 1), tf.argmax(yx, 1))
+            real_accuracy = tf.reduce_mean(
+                tf.cast(real_correct_prediction, tf.float32))
 
-            generated_correct_prediction = tf.equal(tf.argmax(Dg, 1), tf.argmax(yg, 1))
-            generated_accuracy = tf.reduce_mean(tf.cast(generated_correct_prediction, tf.float32))
+            generated_correct_prediction = tf.equal(
+                tf.argmax(Dg, 1), tf.argmax(yg, 1))
+            generated_accuracy = tf.reduce_mean(
+                tf.cast(generated_correct_prediction, tf.float32))
 
         vars = tf.trainable_variables()
         for v in vars:
@@ -86,11 +92,14 @@ class GAN(abc.ABC):
         g_params = [v for v in vars if v.name.startswith('G/')]
 
         with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
-            d_opt = tf.train.AdamOptimizer(1e-4, beta1=0.5, beta2=0.999).minimize(loss_d, var_list=d_params)
-            g_opt = tf.train.AdamOptimizer(1e-4, beta1=0.5, beta2=0.999).minimize(loss_g, var_list=g_params)
+            d_opt = tf.train.AdamOptimizer(
+                1e-4, beta1=0.5, beta2=0.999).minimize(loss_d, var_list=d_params)
+            g_opt = tf.train.AdamOptimizer(
+                1e-4, beta1=0.5, beta2=0.999).minimize(loss_g, var_list=g_params)
 
         start_time = time.time()
-        sample_directory = 'generated_images/{}/{}'.format(self.name, start_time)
+        sample_directory = 'generated_images/{}/{}'.format(
+            self.name, start_time)
         if not os.path.exists(sample_directory):
             os.makedirs(sample_directory)
         shutil.copy(os.path.abspath(__file__), sample_directory)
@@ -113,23 +122,29 @@ class GAN(abc.ABC):
                     g_epoch_losses.append(g_batch_loss)
 
                 if step % 100 == 0:
-                    print('{}: discriminator loss {:.8f}\tgenerator loss {:.8f}'.format(step, np.mean(d_epoch_losses), np.mean(g_epoch_losses)))
+                    current_step_time = time.time()
+                    time_elapsed = current_step_time - previous_step_time
+                    steps_per_sec = 100 / time_elapsed
+                    eta_seconds = (self.training_steps - step) / \
+                        (steps_per_sec + 0.0000001)
+                    eta_minutes = eta_seconds / 60.0
+                    print('[{:d}/{:d}] time: {:.2f}s, d_loss: {:.8f}, g_loss: {:.8f}, eta: {:.2f}m'
+                          .format(step, self.training_steps, time_elapsed,
+                                  np.mean(d_epoch_losses), np.mean(g_epoch_losses), eta_minutes))
                     d_epoch_losses = []
                     g_epoch_losses = []
+                    previous_step_time = current_step_time
 
                 if step % 100 == 0 and self.label_based_discriminator:
-                    real_train_accuracy, generated_train_accuracy = session.run([real_accuracy, generated_accuracy])
+                    real_train_accuracy, generated_train_accuracy = session.run(
+                        [real_accuracy, generated_accuracy])
                     print('label accuracy: {}'.format(real_train_accuracy))
                     print('real/fake accurary: {}'.format(generated_train_accuracy))
 
-                if step % 100 == 0:
-                    current_step_time = time.time()
-                    print('{}: previous 100 steps took {:.4f}s'.format(step, current_step_time - previous_step_time))
-                    previous_step_time = current_step_time
-
                 if step % 1000 == 0:
                     gen_image, discriminator_confidence = session.run([G, Dg])
-                    save_images.save_images(np.reshape(gen_image, [self.batch_size, self.x, self.y, 3]), [10, 10], sample_directory + '/{}gen.png'.format(step))
+                    save_images.save_images(np.reshape(gen_image, [self.batch_size, self.x, self.y, 3]), [
+                                            10, 10], sample_directory + '/{}gen.png'.format(step))
                     # min_discriminator_confidence = np.min(discriminator_confidence)
                     # max_discriminator_confidence = np.max(discriminator_confidence)
                     # print("minimum discriminator confidence: {:.4f} maximum discriminator confidence: {:.4f}\n".format(min_discriminator_confidence, max_discriminator_confidence))
@@ -143,4 +158,5 @@ class GAN(abc.ABC):
 
                 if step % 1000 == 0 and self.output_real_images:
                     real_image = session.run(x)
-                    save_images.save_images(np.reshape(real_image, [self.batch_size, self.x, self.y, 3]), [10, 10], sample_directory + '/{}real.png'.format(step))
+                    save_images.save_images(np.reshape(real_image, [self.batch_size, self.x, self.y, 3]), [
+                                            10, 10], sample_directory + '/{}real.png'.format(step))
