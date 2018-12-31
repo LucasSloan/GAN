@@ -93,7 +93,7 @@ class GAN(abc.ABC):
 
         with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
             d_opt = tf.train.AdamOptimizer(
-                1e-4, beta1=0.5, beta2=0.999).minimize(loss_d, var_list=d_params)
+                4e-4, beta1=0.5, beta2=0.999).minimize(loss_d, var_list=d_params)
             g_opt = tf.train.AdamOptimizer(
                 1e-4, beta1=0.5, beta2=0.999).minimize(loss_g, var_list=g_params)
 
@@ -117,9 +117,8 @@ class GAN(abc.ABC):
                 d_epoch_losses.append(d_batch_loss)
 
                 # update generator
-                if (step - 1) % 5 == 0:
-                    g_batch_loss, _ = session.run([loss_g, g_opt])
-                    g_epoch_losses.append(g_batch_loss)
+                g_batch_loss, _ = session.run([loss_g, g_opt])
+                g_epoch_losses.append(g_batch_loss)
 
                 if step % 100 == 0:
                     current_step_time = time.time()
