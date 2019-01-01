@@ -137,8 +137,8 @@ class GAN(abc.ABC):
                 if step % 100 == 0 and self.label_based_discriminator:
                     real_train_accuracy, generated_train_accuracy = session.run(
                         [real_accuracy, generated_accuracy])
-                    print('label accuracy: {}'.format(real_train_accuracy))
-                    print('real/fake accurary: {}'.format(generated_train_accuracy))
+                    print('label accuracy: {:.6f}'.format(real_train_accuracy))
+                    print('real/fake accurary: {:.6f}'.format(generated_train_accuracy))
 
                 if step % 1000 == 0:
                     gen_image, discriminator_confidence = session.run([G, Dg])
