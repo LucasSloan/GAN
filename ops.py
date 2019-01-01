@@ -121,7 +121,6 @@ def spectral_norm(input_):
 def linear(input_,
            output_size,
            scope=None,
-           stddev=0.02,
            bias_start=0.0,
            use_sn=False):
 
@@ -131,7 +130,7 @@ def linear(input_,
     matrix = tf.get_variable(
         "Matrix", [shape[1], output_size],
         tf.float32,
-        tf.random_normal_initializer(stddev=stddev))
+        tf.contrib.layers.xavier_initializer())
     bias = tf.get_variable(
         "bias", [output_size], initializer=tf.constant_initializer(bias_start))
     if use_sn:
@@ -175,7 +174,7 @@ def spectral_norm_value(var_list, weight_getter):
   return norms
 
 
-def conv2d(input_, output_dim, k_h, k_w, d_h, d_w, stddev=0.02, name="conv2d",
+def conv2d(input_, output_dim, k_h, k_w, d_h, d_w, name="conv2d",
            initializer=tf.contrib.layers.xavier_initializer, use_sn=False):
   with tf.variable_scope(name):
     w = tf.get_variable(
