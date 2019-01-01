@@ -69,15 +69,17 @@ def resnet_discriminator(x, reuse=False, use_sn=True, label_based_discriminator=
             res2, D_DIM * 4, True, "res3", use_sn=use_sn, reuse=reuse) # 8x8
         res4 = resnet_blocks.discriminator_residual_block(
             res3, D_DIM * 8, True, "res4", use_sn=use_sn, reuse=reuse) # 4x4
+        res5 = resnet_blocks.discriminator_residual_block(
+            res4, D_DIM * 8, False, "res5", use_sn=use_sn, reuse=reuse) # 4x4
 
-        res4_flat = tf.reshape(res4, [-1, 4 * 4 * D_DIM * 8])
+        res5_flat = tf.reshape(res5, [-1, 4 * 4 * D_DIM * 8])
 
         if label_based_discriminator:
-            f1_logit = ops.linear(res4_flat, 1001, scope="f1", use_sn=use_sn)
+            f1_logit = ops.linear(res5_flat, 1001, scope="f1", use_sn=use_sn)
             f1 = tf.nn.sigmoid(f1_logit)
             return f1, f1_logit, None
         else:
-            f1_logit = ops.linear(res4_flat, 1, scope="f1", use_sn=use_sn)
+            f1_logit = ops.linear(res5_flat, 1, scope="f1", use_sn=use_sn)
             f1 = tf.nn.sigmoid(f1_logit)
             return f1, f1_logit, None
 
