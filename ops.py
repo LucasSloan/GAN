@@ -176,11 +176,11 @@ def spectral_norm_value(var_list, weight_getter):
 
 
 def conv2d(input_, output_dim, k_h, k_w, d_h, d_w, stddev=0.02, name="conv2d",
-           initializer=tf.truncated_normal_initializer, use_sn=False):
+           initializer=tf.contrib.layers.xavier_initializer, use_sn=False):
   with tf.variable_scope(name):
     w = tf.get_variable(
         "w", [k_h, k_w, input_.get_shape()[-1], output_dim],
-        initializer=initializer(stddev=stddev))
+        initializer=initializer())
     if use_sn:
       conv = tf.nn.conv2d(
           input_, spectral_norm(w), strides=[1, d_h, d_w, 1], padding="SAME")

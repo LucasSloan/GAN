@@ -116,5 +116,5 @@ class IMAGENET_GAN(GAN):
 
         return x, yx, yg
 
-g = IMAGENET_GAN(1000000, 100, True)
+g = IMAGENET_GAN(100000, 100, True)
 g.run()
