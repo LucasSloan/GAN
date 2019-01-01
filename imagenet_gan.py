@@ -35,21 +35,21 @@ def load_imagenet(batch_size):
     dataset = dataset.prefetch(batch_size)
     return dataset.make_one_shot_iterator()
 
-
+G_DIM = 64
 def resnet_generator(z):
     with tf.variable_scope('generator'):
-        linear = ops.linear(z, 4 * 4 * 256, use_sn=True)
-        linear = tf.reshape(linear, [-1, 4, 4, 256])
+        linear = ops.linear(z, 4 * 4 * G_DIM * 8, use_sn=True)
+        linear = tf.reshape(linear, [-1, 4, 4, G_DIM * 8])
 
         res1 = resnet_blocks.generator_residual_block(
-            linear, 256, True, "res1") # 8x8
+            linear, G_DIM * 8, True, "res1") # 8x8
         res2 = resnet_blocks.generator_residual_block(
-            res1, 128, True, "res2") # 16x16
+            res1, G_DIM * 4, True, "res2") # 16x16
 
         res3 = resnet_blocks.generator_residual_block(
-            res2, 64, True, "res3") # 32x32
+            res2, G_DIM * 2, True, "res3") # 32x32
         res4 = resnet_blocks.generator_residual_block(
-            res3, 32, True, "res4") # 64x64
+            res3, G_DIM, True, "res4") # 64x64
         res4 = tf.layers.batch_normalization(res4, training=True)
 
         conv = ops.conv2d(res4, 3, 3, 3, 1, 1, name = "conv", use_sn=True)
@@ -58,18 +58,19 @@ def resnet_generator(z):
         return conv
 
 
+D_DIM = 64
 def resnet_discriminator(x, reuse=False, use_sn=True, label_based_discriminator=False):
     with tf.variable_scope('discriminator', reuse=reuse):
         res1 = resnet_blocks.discriminator_residual_block(
-            x, 32, True, "res1", use_sn=use_sn, reuse=reuse) # 32x32
+            x, D_DIM, True, "res1", use_sn=use_sn, reuse=reuse) # 32x32
         res2 = resnet_blocks.discriminator_residual_block(
-            res1, 64, True, "res2", use_sn=use_sn, reuse=reuse) # 16x16
+            res1, D_DIM * 2, True, "res2", use_sn=use_sn, reuse=reuse) # 16x16
         res3 = resnet_blocks.discriminator_residual_block(
-            res2, 128, True, "res3", use_sn=use_sn, reuse=reuse) # 8x8
+            res2, D_DIM * 4, True, "res3", use_sn=use_sn, reuse=reuse) # 8x8
         res4 = resnet_blocks.discriminator_residual_block(
-            res3, 256, True, "res4", use_sn=use_sn, reuse=reuse) # 4x4
+            res3, D_DIM * 8, True, "res4", use_sn=use_sn, reuse=reuse) # 4x4
 
-        res4_flat = tf.reshape(res4, [-1, 4 * 4 * 256])
+        res4_flat = tf.reshape(res4, [-1, 4 * 4 * D_DIM * 8])
 
         if label_based_discriminator:
             f1_logit = ops.linear(res4_flat, 1001, scope="f1", use_sn=use_sn)
