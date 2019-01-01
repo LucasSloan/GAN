@@ -159,3 +159,7 @@ class GAN(abc.ABC):
                     real_image = session.run(x)
                     save_images.save_images(np.reshape(real_image, [self.batch_size, self.x, self.y, 3]), [
                                             10, 10], sample_directory + '/{}real.png'.format(step))
+
+        total_time = time.time() - start_time
+        print("{} steps took {} minutes".format(
+            self.training_steps, total_time/60))
