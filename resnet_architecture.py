@@ -89,7 +89,9 @@ def get_conv(inputs, in_channels, out_channels, scale, suffix, use_sn):
   #   raise ValueError("Unexpected number of input channels.")
 
   if scale == "up":
+    inputs = tf.transpose(inputs, [0, 2, 3, 1])
     output = unpool(inputs)
+    output = tf.transpose(output, [0, 3, 1, 2])
     output = ops.conv2d(
         output, output_dim=out_channels, k_h=3, k_w=3,
         d_h=1, d_w=1, name="up_%s" % suffix, use_sn=use_sn)
@@ -103,7 +105,7 @@ def get_conv(inputs, in_channels, out_channels, scale, suffix, use_sn):
         inputs, output_dim=out_channels, k_h=3, k_w=3,
         d_h=1, d_w=1, name="down_%s" % suffix, use_sn=use_sn)
     output = tf.nn.pool(
-        output, [2, 2], "AVG", "SAME", strides=[2, 2], name="pool_%s" % suffix)
+        output, [2, 2], "AVG", "SAME", strides=[2, 2], name="pool_%s" % suffix, data_format="NCHW")
     return output
   return None  # Should not happen!
 

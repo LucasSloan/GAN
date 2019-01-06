@@ -7,7 +7,8 @@ def parse_images(filename):
   image_decoded = tf.image.decode_png(image_string, channels=3)
   image_flipped = tf.image.random_flip_left_right(image_decoded)
   image_normalized = 2.0 * tf.image.convert_image_dtype(image_flipped, tf.float32) - 1.0
-  return image_normalized
+  image_nchw = tf.transpose(image_normalized, [2, 0, 1])
+  return image_nchw
 
 def load_images_and_labels(batch_size, data_dir):
     image_files_dataset = tf.data.Dataset.list_files(data_dir + "train/*", shuffle=False)

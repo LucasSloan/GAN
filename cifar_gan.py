@@ -31,7 +31,7 @@ class CIFAR_GAN(GAN):
     def load_data(self, batch_size):
         images_and_labels = cifar_loader.load_images_and_labels(batch_size, FLAGS.data_dir).get_next()
         x = images_and_labels[0]
-        x.set_shape([batch_size, 32, 32, 3])
+        x.set_shape([batch_size, 3, 32, 32])
         yx = images_and_labels[1]
         yg = tf.reshape(tf.tile(tf.one_hot(10, 11), [batch_size]), [batch_size, 11])
 

@@ -142,6 +142,7 @@ class GAN(abc.ABC):
 
                 if step % 1000 == 0:
                     gen_image, discriminator_confidence = session.run([G, Dg])
+                    gen_image = np.transpose(gen_image, [0, 2, 3, 1])
                     save_images.save_images(np.reshape(gen_image, [self.batch_size, self.x, self.y, 3]), [
                                             10, 10], sample_directory + '/{}gen.png'.format(step))
                     # min_discriminator_confidence = np.min(discriminator_confidence)

@@ -46,8 +46,8 @@ def resnet_generator(z):
         f1 = tf.layers.dense(z, 1024, tf.nn.leaky_relu)
         f1 = tf.layers.batch_normalization(f1, training=True)
 
-        f2 = tf.layers.dense(f1, 4*4*128, tf.nn.leaky_relu)
-        f2 = tf.reshape(f2, [-1, 4, 4, 128])
+        f2 = tf.layers.dense(f1, 128*4*4, tf.nn.leaky_relu)
+        f2 = tf.reshape(f2, [-1, 128, 4, 4])
         f2 = tf.layers.batch_normalization(f2, training=True)
 
         res1_1 = resnet_blocks.generator_residual_block(f2, 128, True, "res1_1")
@@ -56,7 +56,7 @@ def resnet_generator(z):
         res2_1 = resnet_blocks.generator_residual_block(res1_2, 128, True, "res2_1")
         res2_2 = resnet_blocks.generator_residual_block(res2_1, 128, False, "res2_2")
 
-        conv = tf.layers.conv2d_transpose(res2_2, 3, (3, 3), strides=(2, 2), padding="same", activation=tf.nn.tanh)
+        conv = tf.layers.conv2d_transpose(res2_2, 3, (3, 3), strides=(2, 2), padding="same", activation=tf.nn.tanh, data_format="channels_first")
 
         return conv
 
@@ -79,7 +79,7 @@ def resnet_discriminator(x, reuse=False, use_sn=True, label_based_discriminator=
         # res3_2 = resnet_blocks.discriminator_residual_block(res3_1, 128, False, "res3_2", use_sn=use_sn, reuse=reuse)
         # res3_3 = resnet_blocks.discriminator_residual_block(res3_2, 128, False, "res3_3", use_sn=use_sn, reuse=reuse)
 
-        res3_flat = tf.reshape(res2_3, [-1, 8*8*128])
+        res3_flat = tf.reshape(res2_3, [100, 128*8*8])
 
         if label_based_discriminator:
             f1_logit = ops.linear(res3_flat, 11, scope="f1", use_sn=use_sn)

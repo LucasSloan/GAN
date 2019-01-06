@@ -178,16 +178,16 @@ def conv2d(input_, output_dim, k_h, k_w, d_h, d_w, name="conv2d",
            initializer=tf.contrib.layers.xavier_initializer, use_sn=False):
   with tf.variable_scope(name):
     w = tf.get_variable(
-        "w", [k_h, k_w, input_.get_shape()[-1], output_dim],
+        "w", [k_h, k_w, input_.get_shape()[1], output_dim],
         initializer=initializer())
     if use_sn:
       conv = tf.nn.conv2d(
-          input_, spectral_norm(w), strides=[1, d_h, d_w, 1], padding="SAME")
+          input_, spectral_norm(w), strides=[1, 1, d_h, d_w], padding="SAME", data_format="NCHW")
     else:
-      conv = tf.nn.conv2d(input_, w, strides=[1, d_h, d_w, 1], padding="SAME")
+      conv = tf.nn.conv2d(input_, w, strides=[1, 1, d_h, d_w], padding="SAME", data_format="NCHW")
     biases = tf.get_variable(
         "biases", [output_dim], initializer=tf.constant_initializer(0.0))
-    return tf.reshape(tf.nn.bias_add(conv, biases), conv.get_shape())
+    return tf.reshape(tf.nn.bias_add(conv, biases, data_format="NCHW"), conv.get_shape())
 
 
 def deconv2d(input_, output_shape, k_h, k_w, d_h, d_w,
