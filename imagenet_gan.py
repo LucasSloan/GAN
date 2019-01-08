@@ -13,6 +13,7 @@ def parse_images(filename):
         tf.image.convert_image_dtype(image_decoded, tf.float32) - 1.0
     image_resized = tf.image.resize_images(image_normalized, [64, 64])
     image_flipped = tf.image.flip_left_right(image_resized)
+    image_nchw = tf.transpose(image_flipped, [2, 0, 1])
 
     filename = tf.reshape(filename, [1])
     path_parts = tf.string_split(filename, "/")
@@ -20,7 +21,7 @@ def parse_images(filename):
     int_label = loader.text_to_index(dir)
     one_hot = loader.text_to_one_hot(dir, 1000)
 
-    return image_flipped, one_hot, int_label
+    return image_nchw, one_hot, int_label
 
 
 def load_imagenet(batch_size):
@@ -38,8 +39,8 @@ def load_imagenet(batch_size):
 G_DIM = 64
 def resnet_generator(z):
     with tf.variable_scope('generator'):
-        linear = ops.linear(z, 4 * 4 * G_DIM * 8, use_sn=True)
-        linear = tf.reshape(linear, [-1, 4, 4, G_DIM * 8])
+        linear = ops.linear(z, G_DIM * 8 * 4 * 4, use_sn=True)
+        linear = tf.reshape(linear, [-1, G_DIM * 8, 4, 4])
 
         res1 = resnet_blocks.generator_residual_block(
             linear, G_DIM * 8, True, "res1") # 8x8
@@ -72,7 +73,7 @@ def resnet_discriminator(x, reuse=False, use_sn=True, label_based_discriminator=
         res5 = resnet_blocks.discriminator_residual_block(
             res4, D_DIM * 8, False, "res5", use_sn=use_sn, reuse=reuse) # 4x4
 
-        res5_flat = tf.reshape(res5, [-1, 4 * 4 * D_DIM * 8])
+        res5_flat = tf.reshape(res5, [-1, G_DIM * 8 * 4 * 4])
 
         if label_based_discriminator:
             f1_logit = ops.linear(res5_flat, 1001, scope="f1", use_sn=use_sn)
@@ -100,7 +101,7 @@ class IMAGENET_GAN(GAN):
     def load_data(self, batch_size):
         images_and_labels = load_imagenet(batch_size).get_next()
         x = images_and_labels[0]
-        x.set_shape([batch_size, 64, 64, 3])
+        x.set_shape([batch_size, 3, 64, 64])
         yx = images_and_labels[1]
         yg = tf.reshape(tf.tile(tf.one_hot(1000, 1001), [batch_size]), [batch_size, 1001])
 
