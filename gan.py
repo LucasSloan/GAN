@@ -157,9 +157,11 @@ class GAN(abc.ABC):
                     # save_images.save_images(min_max_image, [2, 1], sample_directory + '/{}gen_min_max.png'.format(step))
 
                 if step % 1000 == 0 and self.output_real_images:
-                    real_image = session.run(x)
+                    real_image, labels = session.run([x, yx])
+                    real_image = np.transpose(real_image, [0, 2, 3, 1])
                     save_images.save_images(np.reshape(real_image, [self.batch_size, self.x, self.y, 3]), [
                                             10, 10], sample_directory + '/{}real.png'.format(step))
+                    print(np.argmax(labels, 1))
 
         total_time = time.time() - start_time
         print("{} steps took {} minutes".format(
