@@ -16,14 +16,14 @@ def load_images_and_labels(batch_size, data_dir):
     image_dataset = image_files_dataset.map(parse_images, num_parallel_calls=32)
 
     label_lines_dataset = tf.data.TextLineDataset([data_dir + "Train_cntk_text.txt", data_dir + "Test_cntk_text.txt"])
-    label_dataset = label_lines_dataset.map(lambda x : loader.text_to_one_hot(x, 10))
+    label_dataset = label_lines_dataset.map(lambda x : loader.text_to_one_hot(x, 9))
     index_dataset = label_lines_dataset.map(loader.text_to_index)
 
     dataset = tf.data.Dataset.zip((image_dataset, label_dataset, index_dataset))
 
+    dataset = dataset.apply(tf.contrib.data.shuffle_and_repeat(10000))
     dataset = dataset.batch(batch_size)
     # dataset = dataset.cache()
-    dataset = dataset.repeat()
-    # dataset = dataset.apply(tf.contrib.data.shuffle_and_repeat(10000))
+    # dataset = dataset.repeat()
     dataset = dataset.prefetch(batch_size)
     return dataset.make_one_shot_iterator()

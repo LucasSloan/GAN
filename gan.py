@@ -11,79 +11,57 @@ import save_images
 
 
 class GAN(abc.ABC):
-    def __init__(self, x, y, name, training_steps, batch_size, label_based_discriminator, output_real_images=False):
+    def __init__(self, x, y, name, training_steps, batch_size, categories, output_real_images=False):
         self.x = x
         self.y = y
         self.name = name
         self.training_steps = training_steps
         self.batch_size = batch_size
-        self.label_based_discriminator = label_based_discriminator
         self.output_real_images = output_real_images
+        self.categories = categories
 
     @abc.abstractmethod
-    def generator(self, z):
+    def generator(self, z, labels):
         pass
 
     @abc.abstractmethod
-    def discriminator(self, x, label_based_discriminator):
+    def discriminator(self, x, labels):
         pass
 
     @abc.abstractmethod
     def load_data(self, batch_size):
         pass
 
-    def losses(self, Dx_logits, Dg_logits, Dx, Dg, yx, yg):
-        if self.label_based_discriminator:
-            d_loss_real = tf.reduce_mean(
-                tf.nn.sigmoid_cross_entropy_with_logits(
-                    logits=Dx_logits, labels=yx))
-            d_loss_fake = tf.reduce_mean(
-                tf.nn.sigmoid_cross_entropy_with_logits(
-                    logits=Dg_logits, labels=yg))
-            loss_d = d_loss_real + d_loss_fake
-            loss_g = -tf.reduce_mean(
-                tf.nn.sigmoid_cross_entropy_with_logits(
-                    logits=Dg_logits, labels=yg))
-        else:
-            d_loss_real = tf.reduce_mean(
-                tf.nn.sigmoid_cross_entropy_with_logits(
-                    logits=Dx_logits, labels=tf.ones_like(Dx)))
-            d_loss_fake = tf.reduce_mean(
-                tf.nn.sigmoid_cross_entropy_with_logits(
-                    logits=Dg_logits, labels=tf.zeros_like(Dg)))
-            loss_d = d_loss_real + d_loss_fake
-            loss_g = tf.reduce_mean(
-                tf.nn.sigmoid_cross_entropy_with_logits(
-                    logits=Dg_logits, labels=tf.ones_like(Dg)))
+    def losses(self, Dx_logits, Dg_logits, Dx, Dg):
+        d_loss_real = tf.reduce_mean(
+            tf.nn.sigmoid_cross_entropy_with_logits(
+                logits=Dx_logits, labels=tf.ones_like(Dx)))
+        d_loss_fake = tf.reduce_mean(
+            tf.nn.sigmoid_cross_entropy_with_logits(
+                logits=Dg_logits, labels=tf.zeros_like(Dg)))
+        loss_d = d_loss_real + d_loss_fake
+        loss_g = tf.reduce_mean(
+            tf.nn.sigmoid_cross_entropy_with_logits(
+                logits=Dg_logits, labels=tf.ones_like(Dg)))
 
         return loss_d, loss_g
 
     def run(self):
-        x, yx, yg = self.load_data(self.batch_size)
+        x, yx, _ = self.load_data(self.batch_size)
+
+        labels = tf.placeholder(tf.int32, [self.batch_size])
+        yg = tf.one_hot(labels, self.categories, dtype=tf.float32)
 
         z = 2 * tf.random_uniform([self.batch_size, 100]) - 1
 
         with tf.variable_scope('D'):
-            Dx, Dx_logits = self.discriminator(
-                x, self.label_based_discriminator)
+            Dx, Dx_logits = self.discriminator(x, yx)
         with tf.variable_scope('G'):
-            G = self.generator(z)
+            G = self.generator(z, yg)
         with tf.variable_scope('D', reuse=True):
-            Dg, Dg_logits = self.discriminator(
-                G, self.label_based_discriminator)
+            Dg, Dg_logits = self.discriminator(G, yg)
 
-        loss_d, loss_g = self.losses(Dx_logits, Dg_logits, Dx, Dg, yx, yg)
-
-        if self.label_based_discriminator:
-            real_correct_prediction = tf.equal(
-                tf.argmax(Dx, 1), tf.argmax(yx, 1))
-            real_accuracy = tf.reduce_mean(
-                tf.cast(real_correct_prediction, tf.float32))
-
-            generated_correct_prediction = tf.equal(
-                tf.argmax(Dg, 1), tf.argmax(yg, 1))
-            generated_accuracy = tf.reduce_mean(
-                tf.cast(generated_correct_prediction, tf.float32))
+        loss_d, loss_g = self.losses(Dx_logits, Dg_logits, Dx, Dg)
 
         vars = tf.trainable_variables()
         for v in vars:
@@ -113,11 +91,13 @@ class GAN(abc.ABC):
             g_epoch_losses = []
             for step in range(1, self.training_steps + 1):
                 # update discriminator
-                d_batch_loss, _ = session.run([loss_d, d_opt])
+                gen_labels = np.random.randint(0, self.categories, [self.batch_size])
+                d_batch_loss, _ = session.run([loss_d, d_opt], {labels: gen_labels})
                 d_epoch_losses.append(d_batch_loss)
 
                 # update generator
-                g_batch_loss, _ = session.run([loss_g, g_opt])
+                gen_labels = np.random.randint(0, self.categories, [self.batch_size])
+                g_batch_loss, _ = session.run([loss_g, g_opt], {labels: gen_labels})
                 g_epoch_losses.append(g_batch_loss)
 
                 if step % 100 == 0:
@@ -134,17 +114,12 @@ class GAN(abc.ABC):
                     g_epoch_losses = []
                     previous_step_time = current_step_time
 
-                if step % 100 == 0 and self.label_based_discriminator:
-                    real_train_accuracy, generated_train_accuracy = session.run(
-                        [real_accuracy, generated_accuracy])
-                    print('label accuracy: {:.6f}'.format(real_train_accuracy))
-                    print('real/fake accurary: {:.6f}'.format(generated_train_accuracy))
-
                 if step % 1000 == 0:
-                    gen_image, discriminator_confidence = session.run([G, Dg])
+                    gen_labels = np.repeat(np.arange(self.categories), 10)
+                    gen_image, discriminator_confidence = session.run([G, Dg], {labels: gen_labels})
                     gen_image = np.transpose(gen_image, [0, 2, 3, 1])
                     save_images.save_images(np.reshape(gen_image, [self.batch_size, self.x, self.y, 3]), [
-                                            10, 10], sample_directory + '/{}gen.png'.format(step))
+                                            10, self.categories], sample_directory + '/{}gen.png'.format(step))
                     # min_discriminator_confidence = np.min(discriminator_confidence)
                     # max_discriminator_confidence = np.max(discriminator_confidence)
                     # print("minimum discriminator confidence: {:.4f} maximum discriminator confidence: {:.4f}\n".format(min_discriminator_confidence, max_discriminator_confidence))
@@ -157,11 +132,11 @@ class GAN(abc.ABC):
                     # save_images.save_images(min_max_image, [2, 1], sample_directory + '/{}gen_min_max.png'.format(step))
 
                 if step % 1000 == 0 and self.output_real_images:
-                    real_image, labels = session.run([x, yx])
+                    real_image, real_labels = session.run([x, yx])
                     real_image = np.transpose(real_image, [0, 2, 3, 1])
                     save_images.save_images(np.reshape(real_image, [self.batch_size, self.x, self.y, 3]), [
                                             10, 10], sample_directory + '/{}real.png'.format(step))
-                    print(np.argmax(labels, 1))
+                    print(np.argmax(real_labels, 1))
 
         total_time = time.time() - start_time
         print("{} steps took {} minutes".format(
