@@ -45,8 +45,13 @@ def conv_discriminator(x, reuse=False, use_sn=True, label_based_discriminator=Fa
 G_DIM = 64
 def resnet_generator(z, labels):
     with tf.variable_scope('generator'):
-        noise_plus_labels = tf.concat([z, labels], 1)
-        linear = ops.linear(noise_plus_labels, G_DIM * 4 * 4 * 4, use_sn=True)
+        embedding_map = tf.get_variable(
+            name='embedding_map',
+            shape=[10, 100],
+            initializer=tf.contrib.layers.xavier_initializer())
+        label_embedding = tf.nn.embedding_lookup(embedding_map, labels)
+        noise_plus_labels = tf.concat([z, label_embedding], 1)
+        linear = ops.linear(z, G_DIM * 4 * 4 * 4, use_sn=True)
         linear = tf.reshape(linear, [-1, G_DIM * 4, 4, 4])
 
         res1 = resnet_blocks.generator_residual_block(
@@ -80,8 +85,14 @@ def resnet_discriminator(x, labels, reuse=False, use_sn=True):
 
         res4_flat = tf.reshape(res4, [-1, 4 * 4 * D_DIM * 4])
 
-        flat_plus_labels = tf.concat([res4_flat, labels], 1)
+        embedding_map = tf.get_variable(
+            name='embedding_map',
+            shape=[10, 4 * 4 * D_DIM * 4],
+            initializer=tf.contrib.layers.xavier_initializer())
 
-        f1_logit = ops.linear(flat_plus_labels, 1, scope="f1", use_sn=use_sn)
+        label_embedding = tf.nn.embedding_lookup(embedding_map, labels)
+        flat_plus_labels = tf.concat([res4_flat, label_embedding], 1)
+
+        f1_logit = ops.linear(res4_flat, 1, scope="f1", use_sn=use_sn)
         f1 = tf.nn.sigmoid(f1_logit)
         return f1, f1_logit, None

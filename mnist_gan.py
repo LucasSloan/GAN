@@ -51,7 +51,7 @@ class MNIST_GAN(GAN):
         images_and_labels = load_images(batch_size).get_next()
         x = images_and_labels[0]
         x.set_shape([batch_size, 3, 32, 32])
-        yx = images_and_labels[1]
+        yx = images_and_labels[2]
         labels = tf.random.uniform([batch_size], 0, 10, dtype=tf.int32)
         yg = tf.one_hot(labels, 10)
 

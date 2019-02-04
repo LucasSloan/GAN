@@ -50,16 +50,15 @@ class GAN(abc.ABC):
         x, yx, _ = self.load_data(self.batch_size)
 
         labels = tf.placeholder(tf.int32, [self.batch_size])
-        yg = tf.one_hot(labels, self.categories, dtype=tf.float32)
 
         z = 2 * tf.random_uniform([self.batch_size, 100]) - 1
 
         with tf.variable_scope('D'):
             Dx, Dx_logits = self.discriminator(x, yx)
         with tf.variable_scope('G'):
-            G = self.generator(z, yg)
+            G = self.generator(z, labels)
         with tf.variable_scope('D', reuse=True):
-            Dg, Dg_logits = self.discriminator(G, yg)
+            Dg, Dg_logits = self.discriminator(G, labels)
 
         loss_d, loss_g = self.losses(Dx_logits, Dg_logits, Dx, Dg)
 
@@ -136,7 +135,7 @@ class GAN(abc.ABC):
                     real_image = np.transpose(real_image, [0, 2, 3, 1])
                     save_images.save_images(np.reshape(real_image, [self.batch_size, self.x, self.y, 3]), [
                                             10, 10], sample_directory + '/{}real.png'.format(step))
-                    print(np.argmax(real_labels, 1))
+                    print(real_labels, 1)
 
         total_time = time.time() - start_time
         print("{} steps took {} minutes".format(
