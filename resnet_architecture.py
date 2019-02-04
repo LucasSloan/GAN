@@ -52,7 +52,7 @@ def batch_norm_resnet(input_, is_training, scope, epsilon=1e-5):
       updates_collections=None,
       epsilon=epsilon,
       scale=True,
-      fused=True,  # Interesting.
+      fused=False,  # Interesting.
       is_training=is_training,
       scope=scope)
 
