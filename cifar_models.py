@@ -62,6 +62,7 @@ def resnet_generator(z, labels):
         res3 = resnet_blocks.generator_residual_block(
             nl, G_DIM, True, "res3") # 32x32
         res3 = tf.layers.batch_normalization(res3, training=True)
+        res3 = tf.nn.relu(res3)
 
         conv = ops.conv2d(res3, 3, 3, 3, 1, 1, name = "conv", use_sn=True)
         conv = tf.nn.tanh(conv)
@@ -83,6 +84,7 @@ def resnet_discriminator(x, labels, reuse=False, use_sn=True):
         res4 = resnet_blocks.discriminator_residual_block(
             res3, D_DIM * 4, False, "res4", use_sn=use_sn, reuse=reuse) # 4x4
 
+        res4 = tf.nn.relu(res4)
         res4_flat = tf.reshape(res4, [-1, 4 * 4 * D_DIM * 4])
 
         embedding_map = tf.get_variable(
