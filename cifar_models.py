@@ -51,7 +51,7 @@ def resnet_generator(z, labels):
             initializer=tf.contrib.layers.xavier_initializer())
         label_embedding = tf.nn.embedding_lookup(embedding_map, labels)
         noise_plus_labels = tf.concat([z, label_embedding], 1)
-        linear = ops.linear(z, G_DIM * 4 * 4 * 4, use_sn=True)
+        linear = ops.linear(noise_plus_labels, G_DIM * 4 * 4 * 4, use_sn=True)
         linear = tf.reshape(linear, [-1, G_DIM * 4, 4, 4])
 
         res1 = resnet_blocks.generator_residual_block(
@@ -85,16 +85,16 @@ def resnet_discriminator(x, labels, reuse=False, use_sn=True):
             res3, D_DIM * 4, False, "res4", use_sn=use_sn, reuse=reuse) # 4x4
 
         res4 = tf.nn.relu(res4)
-        res4_flat = tf.reshape(res4, [-1, 4 * 4 * D_DIM * 4])
+        res4_chanels = tf.reduce_sum(res4, [2, 3])
+        f1_logit = ops.linear(res4_chanels, 1, scope="f1", use_sn=use_sn)
 
         embedding_map = tf.get_variable(
             name='embedding_map',
-            shape=[10, 4 * 4 * D_DIM * 4],
+            shape=[10, D_DIM * 4],
             initializer=tf.contrib.layers.xavier_initializer())
 
         label_embedding = tf.nn.embedding_lookup(embedding_map, labels)
-        flat_plus_labels = tf.concat([res4_flat, label_embedding], 1)
+        f1_logit += tf.reduce_sum(res4_chanels * label_embedding, axis=1, keepdims=True)
 
-        f1_logit = ops.linear(res4_flat, 1, scope="f1", use_sn=use_sn)
         f1 = tf.nn.sigmoid(f1_logit)
         return f1, f1_logit, None
