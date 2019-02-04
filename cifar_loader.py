@@ -1,29 +1,32 @@
 import tensorflow as tf
 
 import loader
+import os
+
 
 def parse_images(filename):
-  image_string = tf.read_file(filename)
-  image_decoded = tf.image.decode_png(image_string, channels=3)
-  image_flipped = tf.image.random_flip_left_right(image_decoded)
-  image_normalized = 2.0 * tf.image.convert_image_dtype(image_flipped, tf.float32) - 1.0
-  image_nchw = tf.transpose(image_normalized, [2, 0, 1])
-  return image_nchw
+    image_string = tf.read_file(filename)
+    image_decoded = tf.image.decode_png(image_string, channels=3)
+    image_flipped = tf.image.random_flip_left_right(image_decoded)
+    image_normalized = 2.0 * \
+        tf.image.convert_image_dtype(image_flipped, tf.float32) - 1.0
+    image_nchw = tf.transpose(image_normalized, [2, 0, 1])
 
-def load_images_and_labels(batch_size, data_dir):
-    image_files_dataset = tf.data.Dataset.list_files(data_dir + "train/*", shuffle=False)
-    image_files_dataset = image_files_dataset.concatenate(tf.data.Dataset.list_files(data_dir + "test/*", shuffle=False))
-    image_dataset = image_files_dataset.map(parse_images, num_parallel_calls=32)
+    filename = tf.reshape(filename, [1])
+    path_parts = tf.string_split(filename, os.sep)
+    dir = path_parts.values[-2]
+    int_label = loader.text_to_index(dir)
+    one_hot = loader.text_to_one_hot(dir, 9)
 
-    label_lines_dataset = tf.data.TextLineDataset([data_dir + "Train_cntk_text.txt", data_dir + "Test_cntk_text.txt"])
-    label_dataset = label_lines_dataset.map(lambda x : loader.text_to_one_hot(x, 9))
-    index_dataset = label_lines_dataset.map(loader.text_to_index)
+    return image_nchw, one_hot, int_label
 
-    dataset = tf.data.Dataset.zip((image_dataset, label_dataset, index_dataset))
 
-    dataset = dataset.apply(tf.contrib.data.shuffle_and_repeat(10000))
+def load_images_and_labels(batch_size):
+    image_files_dataset = tf.data.Dataset.list_files(
+        "D:\\cifar10\\32x32\\*\\*")
+    image_dataset = image_files_dataset.map(parse_images, num_parallel_calls=8)
+
+    dataset = image_dataset.apply(tf.contrib.data.shuffle_and_repeat(10000))
     dataset = dataset.batch(batch_size)
-    # dataset = dataset.cache()
-    # dataset = dataset.repeat()
     dataset = dataset.prefetch(batch_size)
     return dataset.make_one_shot_iterator()

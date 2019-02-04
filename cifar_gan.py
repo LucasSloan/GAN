@@ -9,11 +9,6 @@ import cifar_loader
 
 from gan import GAN
 
-flags = tf.app.flags
-FLAGS = flags.FLAGS
-
-flags.DEFINE_string("data_dir", "/home/lucas/training_data/cifar10/", "Directory to read the training data from.")
-
 class CIFAR_GAN(GAN):
     def __init__(self, training_steps, batch_size, output_real_images = False):
         super().__init__(32, 32, "cifar", training_steps, batch_size, 10, output_real_images = output_real_images)
@@ -29,10 +24,10 @@ class CIFAR_GAN(GAN):
         return Dx, Dx_logits
 
     def load_data(self, batch_size):
-        images_and_labels = cifar_loader.load_images_and_labels(batch_size, FLAGS.data_dir).get_next()
+        images_and_labels = cifar_loader.load_images_and_labels(batch_size).get_next()
         x = images_and_labels[0]
         x.set_shape([batch_size, 3, 32, 32])
-        yx = images_and_labels[1]
+        yx = images_and_labels[2]
         labels = tf.random.uniform([batch_size], 0, 10, dtype=tf.int32)
         yg = tf.one_hot(labels, 10)
 
