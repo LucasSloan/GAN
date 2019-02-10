@@ -54,13 +54,13 @@ def resnet_generator(z, labels):
         linear = ops.linear(noise_plus_labels, G_DIM * 4 * 4 * 4, use_sn=True)
         linear = tf.reshape(linear, [-1, G_DIM * 4, 4, 4])
 
-        res1 = resnet_blocks.generator_residual_block(
-            linear, G_DIM * 4, True, "res1") # 8x8
-        res2 = resnet_blocks.generator_residual_block(
-            res1, G_DIM * 2, True, "res2") # 16x16
+        res1 = resnet_blocks.class_conditional_generator_block(
+            linear, labels, G_DIM * 4, 10, True, "res1") # 8x8
+        res2 = resnet_blocks.class_conditional_generator_block(
+            res1, labels, G_DIM * 2, 10, True, "res2") # 16x16
         nl = non_local.sn_non_local_block_sim(res2, None, name='nl')
-        res3 = resnet_blocks.generator_residual_block(
-            nl, G_DIM, True, "res3") # 32x32
+        res3 = resnet_blocks.class_conditional_generator_block(
+            nl, labels, G_DIM, 10, True, "res3") # 32x32
         res3 = tf.layers.batch_normalization(res3, training=True)
         res3 = tf.nn.relu(res3)
 
