@@ -46,6 +46,7 @@ def sn_conv1x1(input_, output_dim, update_collection,
     return conv
 
 def sn_non_local_block_sim(x, update_collection, name, init=tf.contrib.layers.xavier_initializer()):
+  x = tf.transpose(x, [0, 2, 3, 1])
   with tf.variable_scope(name):
     batch_size, h, w, num_channels = x.get_shape().as_list()
     location_num = h * w
@@ -78,4 +79,7 @@ def sn_non_local_block_sim(x, update_collection, name, init=tf.contrib.layers.xa
     sigma = tf.get_variable(
         'sigma_ratio', [], initializer=tf.constant_initializer(0.0))
     attn_g = sn_conv1x1(attn_g, num_channels, update_collection, init, 'sn_conv_attn')
-    return x + sigma * attn_g
+
+    out = x + sigma * attn_g
+    out = tf.transpose(out, [0, 3, 1, 2])
+    return out
