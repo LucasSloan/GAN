@@ -7,32 +7,39 @@ import loader
 import os
 
 
-def parse_images(filename):
-    image_string = tf.read_file(filename)
-    image_decoded = tf.image.decode_jpeg(image_string, channels=3)
+image_feature_description = {
+    'image_raw': tf.FixedLenFeature([], tf.string),
+    'label': tf.FixedLenFeature([], tf.int64),
+}
+
+
+def parse_images(tfrecord):
+    proto = tf.parse_single_example(tfrecord, image_feature_description)
+
+    image_decoded = tf.image.decode_jpeg(proto['image_raw'], channels=3)
     image_normalized = 2.0 * \
         tf.image.convert_image_dtype(image_decoded, tf.float32) - 1.0
     image_resized = tf.image.resize_images(image_normalized, [64, 64])
-    image_flipped = tf.image.flip_left_right(image_resized)
+    image_flipped = tf.image.random_flip_left_right(image_resized)
     image_nchw = tf.transpose(image_flipped, [2, 0, 1])
 
-    filename = tf.reshape(filename, [1])
-    path_parts = tf.string_split(filename, os.sep)
-    dir = path_parts.values[-2]
-    int_label = loader.text_to_index(dir)
-    one_hot = loader.text_to_one_hot(dir, 1000)
+    raw_label = proto['label']
+    one_hot_label = tf.one_hot(raw_label, 101)
 
-    return image_nchw, one_hot, int_label
+    return image_nchw, one_hot_label, raw_label
 
 
 def load_imagenet(batch_size):
-    image_files_dataset = tf.data.Dataset.list_files("D:\\imagenet\\2012_train\\*\\*")
-    image_dataset = image_files_dataset.map(parse_images, num_parallel_calls=4)
+    files = tf.data.Dataset.list_files("D:\\imagenet\\tfrecords\\*")
+    raw_dataset = files.apply(tf.contrib.data.parallel_interleave(
+        tf.data.TFRecordDataset, cycle_length=16, sloppy=True))
+    image_dataset = raw_dataset.map(parse_images, num_parallel_calls=16)
 
-    dataset = image_dataset.apply(
+    # dataset = dataset.shuffle(20000)
+    dataset = image_dataset.repeat()
+    # dataset = image_dataset.apply(tf.contrib.data.shuffle_and_repeat(50000))
+    dataset = dataset.apply(
         tf.contrib.data.batch_and_drop_remainder(batch_size))
-    dataset = dataset.repeat()
-    # dataset = dataset.apply(tf.contrib.data.shuffle_and_repeat(10000))
     dataset = dataset.prefetch(batch_size)
     return dataset.make_one_shot_iterator()
 
@@ -100,5 +107,5 @@ class IMAGENET_GAN(GAN):
 
         return x, yx, yg
 
-g = IMAGENET_GAN(100000, 100, True)
+g = IMAGENET_GAN(1000, 100, True)
 g.run()
