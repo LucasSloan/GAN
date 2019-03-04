@@ -19,8 +19,7 @@ def parse_images(tfrecord):
     image_decoded = tf.image.decode_jpeg(proto['image_raw'], channels=3)
     image_normalized = 2.0 * \
         tf.image.convert_image_dtype(image_decoded, tf.float32) - 1.0
-    image_resized = tf.image.resize_images(image_normalized, [64, 64])
-    image_flipped = tf.image.random_flip_left_right(image_resized)
+    image_flipped = tf.image.random_flip_left_right(image_normalized)
     image_nchw = tf.transpose(image_flipped, [2, 0, 1])
 
     raw_label = proto['label']
@@ -30,7 +29,7 @@ def parse_images(tfrecord):
 
 
 def load_imagenet(batch_size):
-    files = tf.data.Dataset.list_files("D:\\imagenet\\tfrecords\\*")
+    files = tf.data.Dataset.list_files("D:\\imagenet\\tfrecords\\64x64\\*")
     raw_dataset = files.apply(tf.contrib.data.parallel_interleave(
         tf.data.TFRecordDataset, cycle_length=16, sloppy=True))
     image_dataset = raw_dataset.map(parse_images, num_parallel_calls=16)
@@ -107,5 +106,5 @@ class IMAGENET_GAN(GAN):
 
         return x, yx, yg
 
-g = IMAGENET_GAN(1000, 100, True)
+g = IMAGENET_GAN(100000, 100, True)
 g.run()
