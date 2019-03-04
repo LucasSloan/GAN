@@ -114,11 +114,12 @@ class GAN(abc.ABC):
                     previous_step_time = current_step_time
 
                 if step % 1000 == 0:
-                    gen_labels = np.repeat(np.arange(self.categories), 10)
+                    gen_labels = np.repeat(np.arange(0, self.categories, self.categories / 10), 10)
+                    print(gen_labels)
                     gen_image, discriminator_confidence = session.run([G, Dg], {labels: gen_labels})
                     gen_image = np.transpose(gen_image, [0, 2, 3, 1])
                     save_images.save_images(np.reshape(gen_image, [self.batch_size, self.x, self.y, 3]), [
-                                            10, self.categories], sample_directory + '/{}gen.png'.format(step))
+                                            10, 10], sample_directory + '/{}gen.png'.format(step))
                     # min_discriminator_confidence = np.min(discriminator_confidence)
                     # max_discriminator_confidence = np.max(discriminator_confidence)
                     # print("minimum discriminator confidence: {:.4f} maximum discriminator confidence: {:.4f}\n".format(min_discriminator_confidence, max_discriminator_confidence))
@@ -135,7 +136,7 @@ class GAN(abc.ABC):
                     real_image = np.transpose(real_image, [0, 2, 3, 1])
                     save_images.save_images(np.reshape(real_image, [self.batch_size, self.x, self.y, 3]), [
                                             10, 10], sample_directory + '/{}real.png'.format(step))
-                    print(real_labels, 1)
+                    print(real_labels)
 
         total_time = time.time() - start_time
         print("{} steps took {} minutes".format(
