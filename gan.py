@@ -120,16 +120,16 @@ class GAN(abc.ABC):
                     gen_image = np.transpose(gen_image, [0, 2, 3, 1])
                     save_images.save_images(np.reshape(gen_image, [self.batch_size, self.x, self.y, 3]), [
                                             10, 10], sample_directory + '/{}gen.png'.format(step))
-                    # min_discriminator_confidence = np.min(discriminator_confidence)
-                    # max_discriminator_confidence = np.max(discriminator_confidence)
-                    # print("minimum discriminator confidence: {:.4f} maximum discriminator confidence: {:.4f}\n".format(min_discriminator_confidence, max_discriminator_confidence))
-                    # min_confidence_index = np.argmin(discriminator_confidence)
-                    # max_confidence_index = np.argmax(discriminator_confidence)
-                    # min_max_image = np.ndarray([2, self.x, self.y, 3])
-                    # min_max_image[0] = gen_image[min_confidence_index]
-                    # min_max_image[1] = gen_image[max_confidence_index]
-                    # print("minimum confidence index: {} maximum confidence index: {}".format(min_confidence_index, max_confidence_index))
-                    # save_images.save_images(min_max_image, [2, 1], sample_directory + '/{}gen_min_max.png'.format(step))
+                    min_max_image = np.ndarray([20, self.x, self.y, 3])
+                    for (i, category_confidence) in enumerate(np.split(discriminator_confidence, 10)):
+                        min_confidence = np.min(category_confidence)
+                        max_confidence = np.max(category_confidence)
+                        min_confidence_index = np.argmin(category_confidence)
+                        max_confidence_index = np.argmax(category_confidence)
+                        print("minimum discriminator confidence: {:.4f} at {} maximum discriminator confidence: {:.4f} at {}".format(min_confidence, min_confidence_index, max_confidence, max_confidence_index))
+                        min_max_image[i*2] = gen_image[i*10 + min_confidence_index]
+                        min_max_image[i*2+1] = gen_image[i*10 + max_confidence_index]
+                    save_images.save_images(min_max_image, [10, 2], sample_directory + '/{}gen_min_max.png'.format(step))
 
                 if step % 1000 == 0 and self.output_real_images:
                     real_image, real_labels = session.run([x, yx])
