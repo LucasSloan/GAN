@@ -120,6 +120,7 @@ class GAN(abc.ABC):
                     gen_image = np.transpose(gen_image, [0, 2, 3, 1])
                     save_images.save_images(np.reshape(gen_image, [self.batch_size, self.x, self.y, 3]), [
                                             10, 10], sample_directory + '/{}gen.png'.format(step))
+
                     min_max_image = np.ndarray([20, self.x, self.y, 3])
                     for (i, category_confidence) in enumerate(np.split(discriminator_confidence, 10)):
                         min_confidence = np.min(category_confidence)
@@ -138,13 +139,20 @@ class GAN(abc.ABC):
                                             10, 10], sample_directory + '/{}real.png'.format(step))
                     print(real_labels)
 
+            min_max_image = np.ndarray([2*self.categories, self.x, self.y, 3])
             for i in range(self.categories):
                 gen_labels = np.tile(i, (100))
                 print(gen_labels)
                 gen_image, discriminator_confidence = session.run([G, Dg], {labels: gen_labels})
                 gen_image = np.transpose(gen_image, [0, 2, 3, 1])
                 save_images.save_images(np.reshape(gen_image, [self.batch_size, self.x, self.y, 3]), [
-                                        10, 10], sample_directory + '/{}category.png'.format(i))
+                                        10, 10], sample_directory + '/category{}.png'.format(i))
+                
+                min_confidence_index = np.argmin(category_confidence)
+                max_confidence_index = np.argmax(category_confidence)
+                min_max_image[i*2] = gen_image[i*10 + min_confidence_index]
+                min_max_image[i*2+1] = gen_image[i*10 + max_confidence_index]
+            save_images.save_images(min_max_image, [self.categories, 2], sample_directory + '/category_gen_min_max.png')
 
         total_time = time.time() - start_time
         print("{} steps took {} minutes".format(
