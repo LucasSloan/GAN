@@ -168,5 +168,5 @@ class IMAGENET_DOG_GAN(GAN):
 
         return x, yx, yg
 
-g = IMAGENET_DOG_GAN(300000, 100, True)
+g = IMAGENET_DOG_GAN(300000, 110, True)
 g.run()

@@ -33,5 +33,5 @@ class CIFAR_GAN(GAN):
 
         return x, yx, yg
 
-g = CIFAR_GAN(200000, 100, True)
+g = CIFAR_GAN(200000, 200, True)
 g.run()

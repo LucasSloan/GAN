@@ -16,6 +16,7 @@ class GAN(abc.ABC):
         self.y = y
         self.name = name
         self.training_steps = training_steps
+        assert batch_size % 10 is 0, "Batch size must be a multiple of 10."
         self.batch_size = batch_size
         self.output_real_images = output_real_images
         self.categories = categories
@@ -49,9 +50,8 @@ class GAN(abc.ABC):
     def run(self):
         x, yx, _ = self.load_data(self.batch_size)
 
-        labels = tf.placeholder(tf.int32, [self.batch_size])
-
-        z = 2 * tf.random_uniform([self.batch_size, 100]) - 1
+        labels = tf.placeholder(tf.int32, [None])
+        z = tf.placeholder(tf.float32, [None, 100])
 
         with tf.variable_scope('D'):
             Dx, Dx_logits = self.discriminator(x, yx)
@@ -91,12 +91,14 @@ class GAN(abc.ABC):
             for step in range(1, self.training_steps + 1):
                 # update discriminator
                 gen_labels = np.random.randint(0, self.categories, [self.batch_size])
-                d_batch_loss, _ = session.run([loss_d, d_opt], {labels: gen_labels})
+                latent =  2 * np.random.rand(self.batch_size, 100) - 1
+                d_batch_loss, _ = session.run([loss_d, d_opt], {labels: gen_labels, z: latent})
                 d_epoch_losses.append(d_batch_loss)
 
                 # update generator
                 gen_labels = np.random.randint(0, self.categories, [self.batch_size])
-                g_batch_loss, _ = session.run([loss_g, g_opt], {labels: gen_labels})
+                latent =  2 * np.random.rand(self.batch_size, 100) - 1
+                g_batch_loss, _ = session.run([loss_g, g_opt], {labels: gen_labels, z: latent})
                 g_epoch_losses.append(g_batch_loss)
 
                 if step % 100 == 0:
@@ -114,11 +116,13 @@ class GAN(abc.ABC):
                     previous_step_time = current_step_time
 
                 if step % 1000 == 0:
+                    # make an array of labels, with 10 labels each from 10 categories
                     gen_labels = np.repeat(np.arange(0, self.categories, self.categories / 10), 10)
                     print(gen_labels)
-                    gen_image, discriminator_confidence = session.run([G, Dg], {labels: gen_labels})
+                    latent =  2 * np.random.rand(100, 100) - 1
+                    gen_image, discriminator_confidence = session.run([G, Dg], {labels: gen_labels, z: latent})
                     gen_image = np.transpose(gen_image, [0, 2, 3, 1])
-                    save_images.save_images(np.reshape(gen_image, [self.batch_size, self.x, self.y, 3]), [
+                    save_images.save_images(np.reshape(gen_image, [100, self.x, self.y, 3]), [
                                             10, 10], sample_directory + '/{}gen.png'.format(step))
 
                     min_max_image = np.ndarray([20, self.x, self.y, 3])
@@ -136,22 +140,23 @@ class GAN(abc.ABC):
                     real_image, real_labels = session.run([x, yx])
                     real_image = np.transpose(real_image, [0, 2, 3, 1])
                     save_images.save_images(np.reshape(real_image, [self.batch_size, self.x, self.y, 3]), [
-                                            10, 10], sample_directory + '/{}real.png'.format(step))
+                                            self.batch_size // 10, 10], sample_directory + '/{}real.png'.format(step))
                     print(real_labels)
 
             min_max_image = np.ndarray([2*self.categories, self.x, self.y, 3])
             for i in range(self.categories):
                 gen_labels = np.tile(i, (100))
                 print(gen_labels)
-                gen_image, discriminator_confidence = session.run([G, Dg], {labels: gen_labels})
+                latent =  2 * np.random.rand(100, 100) - 1
+                gen_image, discriminator_confidence = session.run([G, Dg], {labels: gen_labels, z: latent})
                 gen_image = np.transpose(gen_image, [0, 2, 3, 1])
-                save_images.save_images(np.reshape(gen_image, [self.batch_size, self.x, self.y, 3]), [
+                save_images.save_images(np.reshape(gen_image, [100, self.x, self.y, 3]), [
                                         10, 10], sample_directory + '/category{}.png'.format(i))
                 
                 min_confidence_index = np.argmin(category_confidence)
                 max_confidence_index = np.argmax(category_confidence)
-                min_max_image[i*2] = gen_image[i*10 + min_confidence_index]
-                min_max_image[i*2+1] = gen_image[i*10 + max_confidence_index]
+                min_max_image[i*2] = gen_image[i*self.categories + min_confidence_index]
+                min_max_image[i*2+1] = gen_image[i*self.categories + max_confidence_index]
             save_images.save_images(min_max_image, [self.categories, 2], sample_directory + '/category_gen_min_max.png')
 
         total_time = time.time() - start_time

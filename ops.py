@@ -187,7 +187,8 @@ def conv2d(input_, output_dim, k_h, k_w, d_h, d_w, name="conv2d",
       conv = tf.nn.conv2d(input_, w, strides=[1, 1, d_h, d_w], padding="SAME", data_format="NCHW")
     biases = tf.get_variable(
         "biases", [output_dim], initializer=tf.constant_initializer(0.0))
-    return tf.reshape(tf.nn.bias_add(conv, biases, data_format="NCHW"), conv.get_shape())
+    # return tf.reshape(tf.nn.bias_add(conv, biases, data_format="NCHW"), conv.get_shape())
+    return tf.nn.bias_add(conv, biases, data_format="NCHW")
 
 
 def deconv2d(input_, output_shape, k_h, k_w, d_h, d_w,

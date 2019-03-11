@@ -57,5 +57,5 @@ class MNIST_GAN(GAN):
 
         return x, yx, yg
 
-g = MNIST_GAN(10000, 100, True)
+g = MNIST_GAN(10000, 200, True)
 g.run()
