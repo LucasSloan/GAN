@@ -138,6 +138,14 @@ class GAN(abc.ABC):
                                             10, 10], sample_directory + '/{}real.png'.format(step))
                     print(real_labels)
 
+            for i in range(self.categories):
+                gen_labels = np.tile(i, (100))
+                print(gen_labels)
+                gen_image, discriminator_confidence = session.run([G, Dg], {labels: gen_labels})
+                gen_image = np.transpose(gen_image, [0, 2, 3, 1])
+                save_images.save_images(np.reshape(gen_image, [self.batch_size, self.x, self.y, 3]), [
+                                        10, 10], sample_directory + '/{}category.png'.format(i))
+
         total_time = time.time() - start_time
         print("{} steps took {} minutes".format(
             self.training_steps, total_time/60))
