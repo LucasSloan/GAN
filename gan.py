@@ -10,6 +10,11 @@ import abc
 import save_images
 
 
+flags = tf.app.flags
+FLAGS = flags.FLAGS
+
+flags.DEFINE_string("checkpoint_dir", None, "Directory to load model state from to resume training.")
+
 class GAN(abc.ABC):
     def __init__(self, x, y, name, training_steps, batch_size, categories, output_real_images=False):
         self.x = x
@@ -74,16 +79,39 @@ class GAN(abc.ABC):
             g_opt = tf.train.AdamOptimizer(
                 1e-4, beta1=0.5, beta2=0.999).minimize(loss_g, var_list=g_params)
 
+        d_saver = tf.train.Saver(d_params)
+        g_saver = tf.train.Saver(g_params)
+
         start_time = time.time()
-        sample_directory = 'generated_images/{}/{}'.format(
-            self.name, start_time)
-        if not os.path.exists(sample_directory):
-            os.makedirs(sample_directory)
-        shutil.copy(os.path.abspath(__file__), sample_directory)
+        if FLAGS.checkpoint_dir:
+            sample_directory = FLAGS.checkpoint_dir
+        else:
+            sample_directory = 'generated_images/{}/{}'.format(
+                self.name, start_time)
+            if not os.path.exists(sample_directory):
+                os.makedirs(sample_directory)
+            shutil.copy(os.path.abspath(__file__), sample_directory)
 
         with tf.Session() as session:
             tf.local_variables_initializer().run()
             tf.global_variables_initializer().run()
+
+            if FLAGS.checkpoint_dir:
+                print('attempting to load checkpoint from {}'.format(FLAGS.checkpoint_dir))
+                
+                d_checkpoint_dir = FLAGS.checkpoint_dir + "/disciminator_checkpoints"
+                d_checkpoint = tf.train.get_checkpoint_state(d_checkpoint_dir)
+                if d_checkpoint and d_checkpoint.model_checkpoint_path:
+                    d_saver.restore(session, d_checkpoint.model_checkpoint_path)
+                    print(d_checkpoint)
+                g_checkpoint_dir = FLAGS.checkpoint_dir + "/generator_checkpoints"
+                g_checkpoint = tf.train.get_checkpoint_state(g_checkpoint_dir)
+                if g_checkpoint and g_checkpoint.model_checkpoint_path:
+                    g_saver.restore(session, g_checkpoint.model_checkpoint_path)
+                    print(g_checkpoint)
+            else:
+                print('no checkpoint specified, starting training from scratch')
+
 
             previous_step_time = time.time()
             d_epoch_losses = []
@@ -142,6 +170,16 @@ class GAN(abc.ABC):
                     save_images.save_images(np.reshape(real_image, [self.batch_size, self.x, self.y, 3]), [
                                             self.batch_size // 10, 10], sample_directory + '/{}real.png'.format(step))
                     print(real_labels)
+
+                if step % 1000 == 0:
+                    d_checkpoint_dir = sample_directory + "/disciminator_checkpoints"
+                    if not os.path.exists(d_checkpoint_dir):
+                        os.makedirs(d_checkpoint_dir)
+                    d_saver.save(session, d_checkpoint_dir + '/discriminator.model', global_step=step)
+                    g_checkpoint_dir = sample_directory + "/generator_checkpoints"
+                    if not os.path.exists(g_checkpoint_dir):
+                        os.makedirs(g_checkpoint_dir)
+                    g_saver.save(session, g_checkpoint_dir + '/generator.model', global_step=step)
 
             min_max_image = np.ndarray([2*self.categories, self.x, self.y, 3])
             for i in range(self.categories):
