@@ -96,19 +96,22 @@ class GAN(abc.ABC):
             tf.local_variables_initializer().run()
             tf.global_variables_initializer().run()
 
+            start_step = 1
             if FLAGS.checkpoint_dir:
                 print('attempting to load checkpoint from {}'.format(FLAGS.checkpoint_dir))
                 
                 d_checkpoint_dir = FLAGS.checkpoint_dir + "/disciminator_checkpoints"
                 d_checkpoint = tf.train.get_checkpoint_state(d_checkpoint_dir)
                 if d_checkpoint and d_checkpoint.model_checkpoint_path:
+                    checkpoint_basename = os.path.basename(d_checkpoint.model_checkpoint_path)
+                    checkpoint_step = int(checkpoint_basename.split("-")[1])
+                    print("starting training at step {}".format(checkpoint_step))
+                    start_step = checkpoint_step
                     d_saver.restore(session, d_checkpoint.model_checkpoint_path)
-                    print(d_checkpoint)
                 g_checkpoint_dir = FLAGS.checkpoint_dir + "/generator_checkpoints"
                 g_checkpoint = tf.train.get_checkpoint_state(g_checkpoint_dir)
                 if g_checkpoint and g_checkpoint.model_checkpoint_path:
                     g_saver.restore(session, g_checkpoint.model_checkpoint_path)
-                    print(g_checkpoint)
             else:
                 print('no checkpoint specified, starting training from scratch')
 
@@ -116,7 +119,7 @@ class GAN(abc.ABC):
             previous_step_time = time.time()
             d_epoch_losses = []
             g_epoch_losses = []
-            for step in range(1, self.training_steps + 1):
+            for step in range(start_step, self.training_steps + 1):
                 # update discriminator
                 gen_labels = np.random.randint(0, self.categories, [self.batch_size])
                 latent =  2 * np.random.rand(self.batch_size, 100) - 1
