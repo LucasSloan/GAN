@@ -23,7 +23,7 @@ def parse_images(tfrecord):
     image_flipped = tf.image.random_flip_left_right(image_normalized)
     image_nchw = tf.transpose(image_flipped, [2, 0, 1])
 
-    raw_label = proto['label']
+    raw_label = proto['label'] - 1
     one_hot_label = tf.one_hot(raw_label, 101)
 
     return image_nchw, one_hot_label, raw_label
@@ -168,5 +168,5 @@ class IMAGENET_GAN(GAN):
 
         return x, yx, yg
 
-g = IMAGENET_GAN(300000, 100, True)
+g = IMAGENET_GAN(500000, 100, True)
 g.run()
