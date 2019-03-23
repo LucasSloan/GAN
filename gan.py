@@ -194,10 +194,10 @@ class GAN(abc.ABC):
                 save_images.save_images(np.reshape(gen_image, [100, self.x, self.y, 3]), [
                                         10, 10], sample_directory + '/category{}.png'.format(i))
                 
-                min_confidence_index = np.argmin(category_confidence)
-                max_confidence_index = np.argmax(category_confidence)
-                min_max_image[i*2] = gen_image[i*self.categories + min_confidence_index]
-                min_max_image[i*2+1] = gen_image[i*self.categories + max_confidence_index]
+                min_confidence_index = np.argmin(discriminator_confidence)
+                max_confidence_index = np.argmax(discriminator_confidence)
+                min_max_image[i*2] = gen_image[min_confidence_index]
+                min_max_image[i*2+1] = gen_image[max_confidence_index]
             save_images.save_images(min_max_image, [self.categories, 2], sample_directory + '/category_gen_min_max.png')
 
         total_time = time.time() - start_time
