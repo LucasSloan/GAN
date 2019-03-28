@@ -43,6 +43,40 @@ def conv_discriminator(x, reuse=False, use_sn=True, label_based_discriminator=Fa
             return f1, f1_logit, None
 
 G_DIM = 64
+def simple_resnet_generator(z, labels):
+    with tf.variable_scope('generator'):
+        linear = tf.layers.dense(z, G_DIM * 4 * 4 * 4)
+        linear = tf.reshape(linear, [-1, G_DIM * 4, 4, 4])
+
+        res1 = resnet_blocks.simple_generator_block(linear, G_DIM * 4, "res1") # 8x8
+        res2 = resnet_blocks.simple_generator_block(res1, G_DIM * 2, "res2") # 16x16
+        res3 = resnet_blocks.simple_generator_block(res2, G_DIM, "res3") # 32x32
+        res3 = tf.layers.batch_normalization(res3, training=True)
+        print(res3.shape)
+        res3 = tf.nn.relu(res3)
+
+        conv = tf.layers.conv2d(res3, 3, (3, 3), padding="same", data_format="channels_first")
+        conv = tf.nn.tanh(conv)
+        print(conv.shape)
+
+        return conv
+
+
+
+D_DIM = 64
+def simple_resnet_discriminator(x, labels, reuse=False, use_sn=True):
+    with tf.variable_scope('discriminator', reuse=reuse):
+        res1 = resnet_blocks.simple_discriminator_block(x, D_DIM, "res1") # 16x16
+        res2 = resnet_blocks.simple_discriminator_block(res1, D_DIM * 2, "res2") # 8x8
+        res3 = resnet_blocks.simple_discriminator_block(res2, D_DIM * 4, "res3") # 4x4
+
+        res3_flat = tf.reshape(res3, [-1, 4*4*D_DIM * 4])
+
+        f1_logit = tf.layers.dense(res3_flat, 1)
+        f1 = tf.nn.sigmoid(f1_logit)
+        return f1, f1_logit, None
+
+G_DIM = 64
 def resnet_generator(z, labels):
     with tf.variable_scope('generator'):
         embedding_map = tf.get_variable(

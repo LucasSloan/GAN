@@ -63,6 +63,37 @@ def discriminator_residual_block(input, channels, downsample, name, use_sn=True,
 
     # return output
 
+def simple_generator_block(x, out_channels, name):
+    with tf.variable_scope(name):
+        skip = x
+
+        x = tf.contrib.layers.batch_norm(x, is_training=True, scope="bn1")
+        x = tf.nn.relu(x)
+        x = tf.layers.conv2d_transpose(x, out_channels, (3, 3), strides=(2, 2), padding="same", name="conv1", data_format="channels_first")
+
+        x = tf.contrib.layers.batch_norm(x, is_training=True, scope="bn2")
+        x = tf.nn.relu(x)
+        x = tf.layers.conv2d(x, out_channels, (3, 3), padding="same", name="conv2", data_format="channels_first")
+
+        skip = tf.layers.conv2d_transpose(skip, out_channels, (1, 1), strides=(2, 2), padding="same", data_format="channels_first") 
+
+        return skip + x
+
+def simple_discriminator_block(x, out_channels, name):
+    with tf.variable_scope(name):
+        skip = x
+
+        x = tf.contrib.layers.batch_norm(x, is_training=True, scope="bn1")
+        x = tf.nn.relu(x)
+        x = tf.layers.conv2d(x, out_channels, (3, 3), strides=(2, 2), padding="same", name="conv1", data_format="channels_first")
+
+        x = tf.contrib.layers.batch_norm(x, is_training=True, scope="bn2")
+        x = tf.nn.relu(x)
+        x = tf.layers.conv2d(x, out_channels, (3, 3), padding="same", name="conv2", data_format="channels_first")
+
+        skip = tf.layers.conv2d(skip, out_channels, (1, 1), strides=(2, 2), padding="same", data_format="channels_first") 
+
+        return skip + x
 
 def class_conditional_generator_block(x, labels, out_channels, num_classes, is_training, name):
     with tf.variable_scope(name):

@@ -40,11 +40,11 @@ class MNIST_GAN(GAN):
         super().__init__(32, 32, "mnist", training_steps, batch_size, 10, output_real_images = output_real_images)
 
     def generator(self, z, labels):
-        G = cifar_models.resnet_generator(z, labels)
+        G = cifar_models.simple_resnet_generator(z, labels)
         return G
 
     def discriminator(self, x, labels):
-        Dx, Dx_logits, _ = cifar_models.resnet_discriminator(x, labels, reuse=False, use_sn=True)
+        Dx, Dx_logits, _ = cifar_models.simple_resnet_discriminator(x, labels, reuse=False, use_sn=True)
         return Dx, Dx_logits
 
     def load_data(self, batch_size):
