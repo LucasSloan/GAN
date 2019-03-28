@@ -58,11 +58,11 @@ class GAN(abc.ABC):
         labels = tf.placeholder(tf.int32, [None])
         z = tf.placeholder(tf.float32, [None, 100])
 
-        with tf.variable_scope('D'):
+        with tf.variable_scope('D', reuse=tf.AUTO_REUSE):
             Dx, Dx_logits = self.discriminator(x, yx)
-        with tf.variable_scope('G'):
+        with tf.variable_scope('G', reuse=tf.AUTO_REUSE):
             G = self.generator(z, labels)
-        with tf.variable_scope('D', reuse=True):
+        with tf.variable_scope('D', reuse=tf.AUTO_REUSE):
             Dg, Dg_logits = self.discriminator(G, labels)
 
         loss_d, loss_g = self.losses(Dx_logits, Dg_logits, Dx, Dg)
