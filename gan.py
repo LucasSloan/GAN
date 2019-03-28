@@ -74,10 +74,12 @@ class GAN(abc.ABC):
         g_params = [v for v in vars if v.name.startswith('G/')]
 
         with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
-            d_opt = tf.train.AdamOptimizer(
-                4e-4, beta1=0.5, beta2=0.999).minimize(loss_d, var_list=d_params)
-            g_opt = tf.train.AdamOptimizer(
-                1e-4, beta1=0.5, beta2=0.999).minimize(loss_g, var_list=g_params)
+            d_adam = tf.train.AdamOptimizer(4e-4, beta1=0.5, beta2=0.999)
+            d_grad = d_adam.compute_gradients(loss_d, var_list=d_params)
+            d_opt = d_adam.apply_gradients(d_grad)
+            g_adam = tf.train.AdamOptimizer(1e-4, beta1=0.5, beta2=0.999)
+            g_grad = g_adam.compute_gradients(loss_g, var_list=g_params)
+            g_opt = g_adam.apply_gradients(g_grad)
 
         d_saver = tf.train.Saver(d_params)
         g_saver = tf.train.Saver(g_params)
