@@ -14,6 +14,43 @@ flags = tf.app.flags
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string("checkpoint_dir", None, "Directory to load model state from to resume training.")
+flags.DEFINE_integer("num_gpus", 1, "How many GPUs to train with.")
+
+def average_gradients(tower_grads):
+  """Calculate the average gradient for each shared variable across all towers.
+  Note that this function provides a synchronization point across all towers.
+  Args:
+    tower_grads: List of lists of (gradient, variable) tuples. The outer list
+      is over individual gradients. The inner list is over the gradient
+      calculation for each tower.
+  Returns:
+     List of pairs of (gradient, variable) where the gradient has been averaged
+     across all towers.
+  """
+  average_grads = []
+  for grad_and_vars in zip(*tower_grads):
+    # Note that each grad_and_vars looks like the following:
+    #   ((grad0_gpu0, var0_gpu0), ... , (grad0_gpuN, var0_gpuN))
+    grads = []
+    for g, _ in grad_and_vars:
+      # Add 0 dimension to the gradients to represent the tower.
+      expanded_g = tf.expand_dims(g, 0)
+
+      # Append on a 'tower' dimension which we will average over below.
+      grads.append(expanded_g)
+
+    # Average over the 'tower' dimension.
+    grad = tf.concat(axis=0, values=grads)
+    grad = tf.reduce_mean(grad, 0)
+
+    # Keep in mind that the Variables are redundant because they are shared
+    # across towers. So .. we will just return the first tower's pointer to
+    # the Variable.
+    v = grad_and_vars[0][1]
+    grad_and_var = (grad, v)
+    average_grads.append(grad_and_var)
+  return average_grads
+
 
 class GAN(abc.ABC):
     def __init__(self, x, y, name, training_steps, batch_size, categories, output_real_images=False):
@@ -55,31 +92,35 @@ class GAN(abc.ABC):
     def run(self):
         x, yx, _ = self.load_data(self.batch_size)
 
-        labels = tf.placeholder(tf.int32, [None])
-        z = tf.placeholder(tf.float32, [None, 100])
+        labels = tf.placeholder(tf.int32, [FLAGS.num_gpus, None])
+        z = tf.placeholder(tf.float32, [FLAGS.num_gpus, None, 100])
+        d_adam = tf.train.AdamOptimizer(4e-4, beta1=0.5, beta2=0.999)
+        g_adam = tf.train.AdamOptimizer(1e-4, beta1=0.5, beta2=0.999)
 
-        with tf.variable_scope('D', reuse=tf.AUTO_REUSE):
-            Dx, Dx_logits = self.discriminator(x, yx)
-        with tf.variable_scope('G', reuse=tf.AUTO_REUSE):
-            G = self.generator(z, labels)
-        with tf.variable_scope('D', reuse=tf.AUTO_REUSE):
-            Dg, Dg_logits = self.discriminator(G, labels)
+        d_grads = []
+        g_grads = []
+        for i in range(FLAGS.num_gpus):
+            with tf.device('/gpu:{:d}'.format(i)):
+                with tf.variable_scope('D', reuse=tf.AUTO_REUSE):
+                    Dx, Dx_logits = self.discriminator(x, yx)
+                with tf.variable_scope('G', reuse=tf.AUTO_REUSE):
+                    G = self.generator(z[i], labels[i])
+                with tf.variable_scope('D', reuse=tf.AUTO_REUSE):
+                    Dg, Dg_logits = self.discriminator(G, labels[i])
 
-        loss_d, loss_g = self.losses(Dx_logits, Dg_logits, Dx, Dg)
+                loss_d, loss_g = self.losses(Dx_logits, Dg_logits, Dx, Dg)
 
-        vars = tf.trainable_variables()
-        for v in vars:
-            print(v.name)
-        d_params = [v for v in vars if v.name.startswith('D/')]
-        g_params = [v for v in vars if v.name.startswith('G/')]
+                vars = tf.trainable_variables()
+                for v in vars:
+                    print(v.name)
+                d_params = [v for v in vars if v.name.startswith('D/')]
+                g_params = [v for v in vars if v.name.startswith('G/')]
 
-        with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
-            d_adam = tf.train.AdamOptimizer(4e-4, beta1=0.5, beta2=0.999)
-            d_grad = d_adam.compute_gradients(loss_d, var_list=d_params)
-            d_opt = d_adam.apply_gradients(d_grad)
-            g_adam = tf.train.AdamOptimizer(1e-4, beta1=0.5, beta2=0.999)
-            g_grad = g_adam.compute_gradients(loss_g, var_list=g_params)
-            g_opt = g_adam.apply_gradients(g_grad)
+                d_grads.append(d_adam.compute_gradients(loss_d, var_list=d_params))
+                g_grads.append(g_adam.compute_gradients(loss_g, var_list=g_params))
+
+        d_opt = d_adam.apply_gradients(average_gradients(d_grads))
+        g_opt = g_adam.apply_gradients(average_gradients(g_grads))
 
         d_saver = tf.train.Saver(d_params)
         g_saver = tf.train.Saver(g_params)
@@ -123,14 +164,14 @@ class GAN(abc.ABC):
             g_epoch_losses = []
             for step in range(start_step, self.training_steps + 1):
                 # update discriminator
-                gen_labels = np.random.randint(0, self.categories, [self.batch_size])
-                latent =  2 * np.random.rand(self.batch_size, 100) - 1
+                gen_labels = np.random.randint(0, self.categories, [FLAGS.num_gpus, self.batch_size])
+                latent =  2 * np.random.rand(FLAGS.num_gpus, self.batch_size, 100) - 1
                 d_batch_loss, _ = session.run([loss_d, d_opt], {labels: gen_labels, z: latent})
                 d_epoch_losses.append(d_batch_loss)
 
                 # update generator
-                gen_labels = np.random.randint(0, self.categories, [self.batch_size])
-                latent =  2 * np.random.rand(self.batch_size, 100) - 1
+                gen_labels = np.random.randint(0, self.categories, [FLAGS.num_gpus, self.batch_size])
+                latent =  2 * np.random.rand(FLAGS.num_gpus, self.batch_size, 100) - 1
                 g_batch_loss, _ = session.run([loss_g, g_opt], {labels: gen_labels, z: latent})
                 g_epoch_losses.append(g_batch_loss)
 
@@ -150,9 +191,9 @@ class GAN(abc.ABC):
 
                 if step % 1000 == 0:
                     # make an array of labels, with 10 labels each from 10 categories
-                    gen_labels = np.repeat(np.arange(0, self.categories, self.categories / 10), 10)
+                    gen_labels = np.tile(np.repeat(np.arange(0, self.categories, self.categories / 10), 10), (FLAGS.num_gpus, 1))
                     print(gen_labels)
-                    latent =  2 * np.random.rand(100, 100) - 1
+                    latent =  2 * np.random.rand(FLAGS.num_gpus, 100, 100) - 1
                     gen_image, discriminator_confidence = session.run([G, Dg], {labels: gen_labels, z: latent})
                     gen_image = np.transpose(gen_image, [0, 2, 3, 1])
                     save_images.save_images(np.reshape(gen_image, [100, self.x, self.y, 3]), [
@@ -188,9 +229,9 @@ class GAN(abc.ABC):
 
             min_max_image = np.ndarray([2*self.categories, self.x, self.y, 3])
             for i in range(self.categories):
-                gen_labels = np.tile(i, (100))
+                gen_labels =  np.tile(np.tile(i, (100)), (FLAGS.num_gpus, 1))
                 print(gen_labels)
-                latent =  2 * np.random.rand(100, 100) - 1
+                latent =  2 * np.random.rand(FLAGS.num_gpus, 100, 100) - 1
                 gen_image, discriminator_confidence = session.run([G, Dg], {labels: gen_labels, z: latent})
                 gen_image = np.transpose(gen_image, [0, 2, 3, 1])
                 save_images.save_images(np.reshape(gen_image, [100, self.x, self.y, 3]), [
@@ -205,8 +246,8 @@ class GAN(abc.ABC):
             real_images = np.ndarray([0, self.x, self.y, 3])
             gen_images = np.ndarray([0, self.x, self.y, 3])
             for _ in range(50):
-                gen_labels = np.random.randint(0, self.categories, [self.batch_size])
-                latent =  2 * np.random.rand(self.batch_size, 100) - 1
+                gen_labels = np.random.randint(0, self.categories, [FLAGS.num_gpus, self.batch_size])
+                latent =  2 * np.random.rand(FLAGS.num_gpus, self.batch_size, 100) - 1
                 ri, gi = session.run([x, G], {labels: gen_labels, z: latent})
                 ri = np.transpose(ri, [0, 2, 3, 1])
                 gi = np.transpose(gi, [0, 2, 3, 1])
