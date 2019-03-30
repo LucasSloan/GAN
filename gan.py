@@ -59,6 +59,7 @@ class GAN(abc.ABC):
         self.name = name
         self.training_steps = training_steps
         assert batch_size % 10 is 0, "Batch size must be a multiple of 10."
+        assert batch_size % FLAGS.num_gpus is 0, "Batch size must be a multiple of the number of gpus"
         self.batch_size = batch_size
         self.output_real_images = output_real_images
         self.categories = categories
@@ -91,6 +92,8 @@ class GAN(abc.ABC):
 
     def run(self):
         x, yx, _ = self.load_data(self.batch_size)
+        xs = tf.split(x, FLAGS.num_gpus)
+        yxs = tf.split(yx, FLAGS.num_gpus)
 
         labels = tf.placeholder(tf.int32, [FLAGS.num_gpus, None])
         z = tf.placeholder(tf.float32, [FLAGS.num_gpus, None, 100])
@@ -102,7 +105,7 @@ class GAN(abc.ABC):
         for i in range(FLAGS.num_gpus):
             with tf.device('/gpu:{:d}'.format(i)):
                 with tf.variable_scope('D', reuse=tf.AUTO_REUSE):
-                    Dx, Dx_logits = self.discriminator(x, yx)
+                    Dx, Dx_logits = self.discriminator(xs[i], yxs[i])
                 with tf.variable_scope('G', reuse=tf.AUTO_REUSE):
                     G = self.generator(z[i], labels[i])
                 with tf.variable_scope('D', reuse=tf.AUTO_REUSE):
@@ -164,14 +167,14 @@ class GAN(abc.ABC):
             g_epoch_losses = []
             for step in range(start_step, self.training_steps + 1):
                 # update discriminator
-                gen_labels = np.random.randint(0, self.categories, [FLAGS.num_gpus, self.batch_size])
-                latent =  2 * np.random.rand(FLAGS.num_gpus, self.batch_size, 100) - 1
+                gen_labels = np.random.randint(0, self.categories, [FLAGS.num_gpus, self.batch_size // FLAGS.num_gpus])
+                latent =  2 * np.random.rand(FLAGS.num_gpus, self.batch_size // FLAGS.num_gpus, 100) - 1
                 d_batch_loss, _ = session.run([loss_d, d_opt], {labels: gen_labels, z: latent})
                 d_epoch_losses.append(d_batch_loss)
 
                 # update generator
-                gen_labels = np.random.randint(0, self.categories, [FLAGS.num_gpus, self.batch_size])
-                latent =  2 * np.random.rand(FLAGS.num_gpus, self.batch_size, 100) - 1
+                gen_labels = np.random.randint(0, self.categories, [FLAGS.num_gpus, self.batch_size // FLAGS.num_gpus])
+                latent =  2 * np.random.rand(FLAGS.num_gpus, self.batch_size // FLAGS.num_gpus, 100) - 1
                 g_batch_loss, _ = session.run([loss_g, g_opt], {labels: gen_labels, z: latent})
                 g_epoch_losses.append(g_batch_loss)
 
