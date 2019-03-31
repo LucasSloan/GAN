@@ -64,7 +64,7 @@ def resnet_generator(z, labels):
             nl, labels, G_DIM * 2, 1000, True, "res3") # 32x32
         res4 = resnet_blocks.class_conditional_generator_block(
             res3, labels, G_DIM, 1000, True, "res4") # 64x64
-        res3 = tf.layers.batch_normalization(res4, training=True)
+        res4 = tf.layers.batch_normalization(res4, training=True)
         res4 = tf.nn.relu(res4)
 
         conv = ops.conv2d(res4, 3, 3, 3, 1, 1, name = "conv", use_sn=True)
