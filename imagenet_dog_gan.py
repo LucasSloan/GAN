@@ -37,7 +37,7 @@ def load_imagenet(batch_size):
 
     # dataset = dataset.shuffle(20000)
     # dataset = image_dataset.repeat()
-    dataset = image_dataset.apply(tf.contrib.data.shuffle_and_repeat(400000))
+    dataset = image_dataset.apply(tf.contrib.data.shuffle_and_repeat(200000))
     dataset = dataset.apply(
         tf.contrib.data.batch_and_drop_remainder(batch_size))
     dataset = dataset.prefetch(batch_size)
@@ -168,5 +168,5 @@ class IMAGENET_DOG_GAN(GAN):
 
         return x, yx, yg
 
-g = IMAGENET_DOG_GAN(300000, 110, True)
+g = IMAGENET_DOG_GAN(300000, 300, True)
 g.run()
