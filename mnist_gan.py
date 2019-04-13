@@ -24,9 +24,9 @@ def parse_images(filename):
 
 
 def load_images(batch_size):
-    image_files_dataset = tf.data.Dataset.list_files("D:\\mnist\\train\\*\\*")
+    image_files_dataset = tf.data.Dataset.list_files("/mnt/Bulk Storage/mnist/train/*/*")
     image_files_dataset = image_files_dataset.concatenate(
-        tf.data.Dataset.list_files("D:\\mnist\\test\\*\\*"))
+        tf.data.Dataset.list_files("/mnt/Bulk Storage/mnist/test/*/*"))
     image_dataset = image_files_dataset.map(parse_images, num_parallel_calls=8)
 
     dataset = image_dataset.apply(tf.contrib.data.shuffle_and_repeat(10000))

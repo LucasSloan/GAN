@@ -30,7 +30,7 @@ def parse_images(tfrecord):
 
 
 def load_imagenet(batch_size):
-    files = tf.data.Dataset.list_files("D:\\imagenet\\tfrecords\\64x64_dog\\*")
+    files = tf.data.Dataset.list_files("/mnt/Bulk Storage/imagenet/tfrecords/64x64_dog/*")
     raw_dataset = files.apply(tf.contrib.data.parallel_interleave(
         tf.data.TFRecordDataset, cycle_length=16, sloppy=True))
     image_dataset = raw_dataset.map(parse_images, num_parallel_calls=16)
