@@ -246,22 +246,6 @@ class GAN(abc.ABC):
                 min_max_image[i*2+1] = gen_image[max_confidence_index]
             save_images.save_images(min_max_image, [self.categories, 2], sample_directory + '/category_gen_min_max.png')
 
-            real_images = np.ndarray([0, self.x, self.y, 3])
-            gen_images = np.ndarray([0, self.x, self.y, 3])
-            for _ in range(50):
-                gen_labels = np.random.randint(0, self.categories, [FLAGS.num_gpus, self.batch_size])
-                latent =  2 * np.random.rand(FLAGS.num_gpus, self.batch_size, 100) - 1
-                ri, gi = session.run([x, G], {labels: gen_labels, z: latent})
-                ri = np.transpose(ri, [0, 2, 3, 1])
-                gi = np.transpose(gi, [0, 2, 3, 1])
-                print("ri", ri.shape, ri.dtype)
-                print("gi", gi.shape, gi.dtype)
-                real_images = np.concatenate((real_images, ri))
-                gen_images = np.concatenate((gen_images, gi))
-                tf.contrib.gan.eval.run_inception(ri, image_size=self.x)
-            tf.contrib.gan.eval.frechet_classifier_distance(real_images, gen_images, lambda images: tf.contrib.gan.eval.run_inception(images, image_size=self.x))
-
-
         total_time = time.time() - start_time
         print("{} steps took {} minutes".format(
             self.training_steps, total_time/60))
