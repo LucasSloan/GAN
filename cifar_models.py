@@ -57,7 +57,6 @@ def simple_resnet_generator(z, labels):
 
         conv = tf.layers.conv2d(res3, 3, (3, 3), padding="same", data_format="channels_first")
         conv = tf.nn.tanh(conv)
-        conv.set_shape([100, 3, 32, 32])
 
         return conv
 
@@ -65,7 +64,6 @@ def simple_resnet_generator(z, labels):
 
 D_DIM = 64
 def simple_resnet_discriminator(x, labels, reuse=False, use_sn=True):
-    x.set_shape([100, 3, 32, 32])
     with tf.variable_scope('discriminator', reuse=reuse):
         res1 = resnet_blocks.simple_discriminator_block(x, D_DIM, "res1") # 16x16
         res2 = resnet_blocks.simple_discriminator_block(res1, D_DIM * 2, "res2") # 8x8
