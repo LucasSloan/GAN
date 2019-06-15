@@ -139,7 +139,9 @@ class GAN(abc.ABC):
             shutil.copy(os.path.abspath(__file__), sample_directory)
 
         with tf.contrib.tfprof.ProfileContext('/tmp/train_dir', dump_steps=[10]) as pctx:
-            with tf.Session() as session:
+            config = tf.ConfigProto()
+            config.gpu_options.allow_growth = True
+            with tf.Session(config=config) as session:
                 tf.local_variables_initializer().run()
                 tf.global_variables_initializer().run()
 
