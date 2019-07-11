@@ -28,7 +28,7 @@ def parse_images(filename):
 
 def load_images_and_labels(batch_size):
     image_files_dataset = tf.data.Dataset.list_files(
-        "/mnt/Bulk Storage/cifar10/32x32/*/*")
+        "D:\\cifar10\\32x32\\*\\*")
     image_dataset = image_files_dataset.map(parse_images, num_parallel_calls=8)
 
     dataset = image_dataset.apply(tf.contrib.data.shuffle_and_repeat(10000))
