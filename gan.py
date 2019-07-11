@@ -138,92 +138,91 @@ class GAN(abc.ABC):
                 os.makedirs(sample_directory)
             shutil.copy(os.path.abspath(__file__), sample_directory)
 
-        with tf.contrib.tfprof.ProfileContext('/tmp/train_dir', dump_steps=[10]) as pctx:
-            config = tf.ConfigProto()
-            config.gpu_options.allow_growth = True
-            with tf.Session(config=config) as session:
-                tf.local_variables_initializer().run()
-                tf.global_variables_initializer().run()
 
-                start_step = 1
-                if FLAGS.checkpoint_dir:
-                    print('attempting to load checkpoint from {}'.format(FLAGS.checkpoint_dir))
-                    
-                    d_checkpoint_dir = FLAGS.checkpoint_dir + "/disciminator_checkpoints"
-                    d_checkpoint = tf.train.get_checkpoint_state(d_checkpoint_dir)
-                    if d_checkpoint and d_checkpoint.model_checkpoint_path:
-                        checkpoint_basename = os.path.basename(d_checkpoint.model_checkpoint_path)
-                        checkpoint_step = int(checkpoint_basename.split("-")[1])
-                        print("starting training at step {}".format(checkpoint_step))
-                        start_step = checkpoint_step
-                        d_saver.restore(session, d_checkpoint.model_checkpoint_path)
-                    g_checkpoint_dir = FLAGS.checkpoint_dir + "/generator_checkpoints"
-                    g_checkpoint = tf.train.get_checkpoint_state(g_checkpoint_dir)
-                    if g_checkpoint and g_checkpoint.model_checkpoint_path:
-                        g_saver.restore(session, g_checkpoint.model_checkpoint_path)
-                else:
-                    print('no checkpoint specified, starting training from scratch')
+        config = tf.ConfigProto()
+        config.gpu_options.allow_growth = True
+        with tf.Session(config=config) as session:
+            tf.local_variables_initializer().run()
+            tf.global_variables_initializer().run()
+
+            start_step = 1
+            if FLAGS.checkpoint_dir:
+                print('attempting to load checkpoint from {}'.format(FLAGS.checkpoint_dir))
+                
+                d_checkpoint_dir = FLAGS.checkpoint_dir + "/disciminator_checkpoints"
+                d_checkpoint = tf.train.get_checkpoint_state(d_checkpoint_dir)
+                if d_checkpoint and d_checkpoint.model_checkpoint_path:
+                    checkpoint_basename = os.path.basename(d_checkpoint.model_checkpoint_path)
+                    checkpoint_step = int(checkpoint_basename.split("-")[1])
+                    print("starting training at step {}".format(checkpoint_step))
+                    start_step = checkpoint_step
+                    d_saver.restore(session, d_checkpoint.model_checkpoint_path)
+                g_checkpoint_dir = FLAGS.checkpoint_dir + "/generator_checkpoints"
+                g_checkpoint = tf.train.get_checkpoint_state(g_checkpoint_dir)
+                if g_checkpoint and g_checkpoint.model_checkpoint_path:
+                    g_saver.restore(session, g_checkpoint.model_checkpoint_path)
+            else:
+                print('no checkpoint specified, starting training from scratch')
 
 
-                previous_step_time = time.time()
-                d_epoch_losses = []
-                g_epoch_losses = []
-                for step in range(start_step, self.training_steps + 1):
-                    # update discriminator
-                    gen_labels = np.random.randint(0, self.categories, [FLAGS.num_gpus, self.batch_size // FLAGS.num_gpus])
+            previous_step_time = time.time()
+            d_epoch_losses = []
+            g_epoch_losses = []
+            for step in range(start_step, self.training_steps + 1):
+                # update discriminator
+                gen_labels = np.random.randint(0, self.categories, [FLAGS.num_gpus, self.batch_size // FLAGS.num_gpus])
+                latent =  2 * np.random.rand(FLAGS.num_gpus, self.batch_size // FLAGS.num_gpus, 100) - 1
+                d_batch_loss, _ = session.run([loss_d, d_opt], {labels: gen_labels, z: latent})
+                d_epoch_losses.append(d_batch_loss)
+
+                # update generator
+                gen_labels = np.random.randint(0, self.categories, [FLAGS.num_gpus, self.batch_size // FLAGS.num_gpus])
+                latent =  2 * np.random.rand(FLAGS.num_gpus, self.batch_size // FLAGS.num_gpus, 100) - 1
+                g_batch_loss, _ = session.run([loss_g, g_opt], {labels: gen_labels, z: latent})
+                g_epoch_losses.append(g_batch_loss)
+
+                if step % 100 == 0:
+                    current_step_time = time.time()
+                    time_elapsed = current_step_time - previous_step_time
+                    steps_per_sec = 100 / time_elapsed
+                    eta_seconds = (self.training_steps - step) / \
+                        (steps_per_sec + 0.0000001)
+                    eta_minutes = eta_seconds / 60.0
+                    print('[{:d}/{:d}] time: {:.2f}s, d_loss: {:.8f}, g_loss: {:.8f}, eta: {:.2f}m'
+                        .format(step, self.training_steps, time_elapsed,
+                                np.mean(d_epoch_losses), np.mean(g_epoch_losses), eta_minutes))
+                    d_epoch_losses = []
+                    g_epoch_losses = []
+                    previous_step_time = current_step_time
+
+                if step % 1000 == 0:
+                    # make an array of labels, with 10 labels each from batch_size/10 categories
+                    gen_labels = np.tile(np.repeat(np.arange(0, self.categories, self.categories / (self.batch_size // FLAGS.num_gpus // 10)), 10), (FLAGS.num_gpus, 1))
+                    print(gen_labels)
                     latent =  2 * np.random.rand(FLAGS.num_gpus, self.batch_size // FLAGS.num_gpus, 100) - 1
-                    d_batch_loss, _ = session.run([loss_d, d_opt], {labels: gen_labels, z: latent})
-                    d_epoch_losses.append(d_batch_loss)
-
-                    # update generator
-                    gen_labels = np.random.randint(0, self.categories, [FLAGS.num_gpus, self.batch_size // FLAGS.num_gpus])
-                    latent =  2 * np.random.rand(FLAGS.num_gpus, self.batch_size // FLAGS.num_gpus, 100) - 1
-                    g_batch_loss, _ = session.run([loss_g, g_opt], {labels: gen_labels, z: latent})
-                    g_epoch_losses.append(g_batch_loss)
-
-                    if step % 100 == 0:
-                        current_step_time = time.time()
-                        time_elapsed = current_step_time - previous_step_time
-                        steps_per_sec = 100 / time_elapsed
-                        eta_seconds = (self.training_steps - step) / \
-                            (steps_per_sec + 0.0000001)
-                        eta_minutes = eta_seconds / 60.0
-                        print('[{:d}/{:d}] time: {:.2f}s, d_loss: {:.8f}, g_loss: {:.8f}, eta: {:.2f}m'
-                            .format(step, self.training_steps, time_elapsed,
-                                    np.mean(d_epoch_losses), np.mean(g_epoch_losses), eta_minutes))
-                        d_epoch_losses = []
-                        g_epoch_losses = []
-                        previous_step_time = current_step_time
-
-                    if step % 1000 == 0:
-                        # make an array of labels, with 10 labels each from 10 categories
-                        gen_labels = np.tile(np.repeat(np.arange(0, self.categories, self.categories / (self.batch_size // FLAGS.num_gpus // 10)), 10), (FLAGS.num_gpus, 1))
-                        print(gen_labels)
-                        latent =  2 * np.random.rand(FLAGS.num_gpus, self.batch_size // FLAGS.num_gpus, 100) - 1
-                        gen_image, discriminator_confidence = session.run([G, Dg], {labels: gen_labels, z: latent})
-                        gen_image = np.transpose(gen_image, [0, 2, 3, 1])
-                        save_images.save_images(np.reshape(gen_image, [self.batch_size // FLAGS.num_gpus, self.x, self.y, 3]), [
-                                                self.batch_size // FLAGS.num_gpus // 10, 10], sample_directory + '/{}gen.png'.format(step))
+                    gen_image, discriminator_confidence = session.run([G, Dg], {labels: gen_labels, z: latent})
+                    gen_image = np.transpose(gen_image, [0, 2, 3, 1])
+                    save_images.save_images(np.reshape(gen_image, [self.batch_size // FLAGS.num_gpus, self.x, self.y, 3]), [
+                                            self.batch_size // FLAGS.num_gpus // 10, 10], sample_directory + '/{}gen.png'.format(step))
 
 
-                    if step % 1000 == 0 and self.output_real_images:
-                        real_image, real_labels = session.run([x, yx])
-                        real_image = np.transpose(real_image, [0, 2, 3, 1])
-                        save_images.save_images(np.reshape(real_image, [self.batch_size, self.x, self.y, 3]), [
-                                                self.batch_size // 10, 10], sample_directory + '/{}real.png'.format(step))
-                        print(real_labels)
+                if step % 1000 == 0 and self.output_real_images:
+                    real_image, real_labels = session.run([x, yx])
+                    real_image = np.transpose(real_image, [0, 2, 3, 1])
+                    save_images.save_images(np.reshape(real_image, [self.batch_size, self.x, self.y, 3]), [
+                                            self.batch_size // 10, 10], sample_directory + '/{}real.png'.format(step))
+                    print(real_labels)
 
-                    if step % 1000 == 0:
-                        d_checkpoint_dir = sample_directory + "/disciminator_checkpoints"
-                        if not os.path.exists(d_checkpoint_dir):
-                            os.makedirs(d_checkpoint_dir)
-                        d_saver.save(session, d_checkpoint_dir + '/discriminator.model', global_step=step)
-                        g_checkpoint_dir = sample_directory + "/generator_checkpoints"
-                        if not os.path.exists(g_checkpoint_dir):
-                            os.makedirs(g_checkpoint_dir)
-                        g_saver.save(session, g_checkpoint_dir + '/generator.model', global_step=step)
+                if step % 1000 == 0:
+                    d_checkpoint_dir = sample_directory + "/disciminator_checkpoints"
+                    if not os.path.exists(d_checkpoint_dir):
+                        os.makedirs(d_checkpoint_dir)
+                    d_saver.save(session, d_checkpoint_dir + '/discriminator.model', global_step=step)
+                    g_checkpoint_dir = sample_directory + "/generator_checkpoints"
+                    if not os.path.exists(g_checkpoint_dir):
+                        os.makedirs(g_checkpoint_dir)
+                    g_saver.save(session, g_checkpoint_dir + '/generator.model', global_step=step)
 
-
-            total_time = time.time() - start_time
-            print("{} steps took {} minutes".format(
-                self.training_steps, total_time/60))
+        total_time = time.time() - start_time
+        print("{} steps took {} minutes".format(
+            self.training_steps, total_time/60))
