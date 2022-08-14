@@ -9,6 +9,8 @@ import cifar_loader
 
 from gan import GAN
 
+tf.compat.v1.disable_eager_execution()
+
 class CIFAR_GAN(GAN):
     def __init__(self, training_steps, batch_size, output_real_images = False):
         super().__init__(32, 32, "cifar", training_steps, batch_size, 10, output_real_images = output_real_images)

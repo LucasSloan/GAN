@@ -4,18 +4,17 @@ from gan import GAN
 import resnet_blocks
 import ops
 import loader
-import os
-import non_local
 
+tf.compat.v1.disable_eager_execution()
 
 image_feature_description = {
-    'image_raw': tf.FixedLenFeature([], tf.string),
-    'label': tf.FixedLenFeature([], tf.int64),
+    'image_raw': tf.io.FixedLenFeature([], tf.string),
+    'label': tf.io.FixedLenFeature([], tf.int64),
 }
 
 
 def parse_images(tfrecord):
-    proto = tf.parse_single_example(tfrecord, image_feature_description)
+    proto = tf.io.parse_single_example(tfrecord, image_feature_description)
 
     image_decoded = tf.image.decode_jpeg(proto['image_raw'], channels=3)
     image_normalized = 2.0 * \
@@ -30,22 +29,19 @@ def parse_images(tfrecord):
 
 
 def load_imagenet(batch_size):
-    files = tf.data.Dataset.list_files("D:\\imagenet\\tfrecords\\64x64\\*")
-    raw_dataset = files.apply(tf.contrib.data.parallel_interleave(
-        tf.data.TFRecordDataset, cycle_length=16, sloppy=True))
-    image_dataset = raw_dataset.map(parse_images, num_parallel_calls=16)
-
-    # dataset = dataset.shuffle(20000)
-    # dataset = image_dataset.repeat()
-    dataset = image_dataset.apply(tf.contrib.data.shuffle_and_repeat(400000))
-    dataset = dataset.apply(
-        tf.contrib.data.batch_and_drop_remainder(batch_size))
-    dataset = dataset.prefetch(batch_size)
-    return dataset.make_one_shot_iterator()
+    files = tf.data.Dataset.list_files("/mnt/Bulk Storage/imagenet/tfrecords/64x64/*")
+    dataset = files.interleave(lambda f: tf.data.TFRecordDataset(f), cycle_length=tf.data.AUTOTUNE, num_parallel_calls=tf.data.AUTOTUNE)
+    dataset = dataset.map(parse_images, num_parallel_calls=tf.data.AUTOTUNE)
+    dataset = dataset.shuffle(40000)
+    dataset = dataset.repeat()
+    dataset = dataset.batch(batch_size, drop_remainder=True)
+    dataset = dataset.prefetch(tf.data.AUTOTUNE)
+    
+    return tf.compat.v1.data.make_one_shot_iterator(dataset)
 
 G_DIM = 64
 def resnet_generator(z, labels):
-    with tf.variable_scope('generator'):
+    with tf.compat.v1.variable_scope('generator'):
         embedding_map = tf.get_variable(
             name='embedding_map',
             shape=[1000, 100],
@@ -72,30 +68,9 @@ def resnet_generator(z, labels):
 
         return conv
 
-
-        # linear = ops.linear(z, G_DIM * 8 * 4 * 4, use_sn=True)
-        # linear = tf.reshape(linear, [-1, G_DIM * 8, 4, 4])
-
-        # res1 = resnet_blocks.generator_residual_block(
-        #     linear, G_DIM * 8, True, "res1") # 8x8
-        # res2 = resnet_blocks.generator_residual_block(
-        #     res1, G_DIM * 4, True, "res2") # 16x16
-        # nl = non_local.sn_non_local_block_sim(res2, None, name='nl')
-        # res3 = resnet_blocks.generator_residual_block(
-        #     nl, G_DIM * 2, True, "res3") # 32x32
-        # res4 = resnet_blocks.generator_residual_block(
-        #     res3, G_DIM, True, "res4") # 64x64
-        # res4 = tf.layers.batch_normalization(res4, training=True)
-
-        # conv = ops.conv2d(res4, 3, 3, 3, 1, 1, name = "conv", use_sn=True)
-        # conv = tf.nn.tanh(conv)
-
-        # return conv
-
-
 D_DIM = 64
 def resnet_discriminator(x, labels, reuse=False, use_sn=True):
-    with tf.variable_scope('discriminator', reuse=reuse):
+    with tf.compat.v1.variable_scope('discriminator', reuse=reuse):
         res1 = resnet_blocks.discriminator_residual_block(
             x, D_DIM, True, "res1", use_sn=use_sn, reuse=reuse) # 32x32
         res2 = resnet_blocks.discriminator_residual_block(
@@ -122,31 +97,6 @@ def resnet_discriminator(x, labels, reuse=False, use_sn=True):
 
         f1 = tf.nn.sigmoid(f1_logit)
         return f1, f1_logit, None
-
-
-        # res1 = resnet_blocks.discriminator_residual_block(
-        #     x, D_DIM, True, "res1", use_sn=use_sn, reuse=reuse) # 32x32
-        # res2 = resnet_blocks.discriminator_residual_block(
-        #     res1, D_DIM * 2, True, "res2", use_sn=use_sn, reuse=reuse) # 16x16
-        # nl = non_local.sn_non_local_block_sim(res2, None, name="nl")
-        # res3 = resnet_blocks.discriminator_residual_block(
-        #     nl, D_DIM * 4, True, "res3", use_sn=use_sn, reuse=reuse) # 8x8
-        # res4 = resnet_blocks.discriminator_residual_block(
-        #     res3, D_DIM * 8, True, "res4", use_sn=use_sn, reuse=reuse) # 4x4
-        # res5 = resnet_blocks.discriminator_residual_block(
-        #     res4, D_DIM * 8, False, "res5", use_sn=use_sn, reuse=reuse) # 4x4
-
-        # res5_flat = tf.reshape(res5, [-1, G_DIM * 8 * 4 * 4])
-
-        # if label_based_discriminator:
-        #     f1_logit = ops.linear(res5_flat, 101, scope="f1", use_sn=use_sn)
-        #     f1 = tf.nn.sigmoid(f1_logit)
-        #     return f1, f1_logit, None
-        # else:
-        #     f1_logit = ops.linear(res5_flat, 1, scope="f1", use_sn=use_sn)
-        #     f1 = tf.nn.sigmoid(f1_logit)
-        #     return f1, f1_logit, None
-
 
 class IMAGENET_GAN(GAN):
     def __init__(self, training_steps, batch_size, label_based_discriminator, output_real_images=False):

@@ -64,7 +64,7 @@ def discriminator_residual_block(input, channels, downsample, name, use_sn=True,
     # return output
 
 def simple_generator_block(x, out_channels, name):
-    with tf.variable_scope(name):
+    with tf.compat.v1.variable_scope(name):
         skip = x
 
         x = tf.contrib.layers.batch_norm(x, is_training=True, scope="bn1")
@@ -80,7 +80,7 @@ def simple_generator_block(x, out_channels, name):
         return skip + x
 
 def simple_discriminator_block(x, out_channels, name):
-    with tf.variable_scope(name):
+    with tf.compat.v1.variable_scope(name):
         skip = x
 
         x = tf.contrib.layers.batch_norm(x, is_training=True, scope="bn1")
@@ -96,7 +96,7 @@ def simple_discriminator_block(x, out_channels, name):
         return skip + x
 
 def class_conditional_generator_block(x, labels, out_channels, num_classes, is_training, name):
-    with tf.variable_scope(name):
+    with tf.compat.v1.variable_scope(name):
         bn0 = ops.ConditionalBatchNorm(num_classes, name='cbn_0')
         bn1 = ops.ConditionalBatchNorm(num_classes, name='cbn_1')
         x_0 = x

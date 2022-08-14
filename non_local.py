@@ -18,13 +18,13 @@ import numpy as np
 import ops
 
 def sn_conv1x1(input_, output_dim, update_collection,
-              init=tf.contrib.layers.xavier_initializer(), name='sn_conv1x1'):
-  with tf.variable_scope(name):
+              init=tf.keras.initializers.glorot_normal, name='sn_conv1x1'):
+  with tf.compat.v1.variable_scope(name):
     k_h = 1
     k_w = 1
     d_h = 1
     d_w = 1
-    w = tf.get_variable(
+    w = tf.compat.v1.get_variable(
         'w', [k_h, k_w, input_.get_shape()[1], output_dim],
         initializer=init)
     w_bar = ops.spectral_norm(w)
@@ -32,8 +32,8 @@ def sn_conv1x1(input_, output_dim, update_collection,
     conv = tf.nn.conv2d(input_, w_bar, strides=[1, d_h, d_w, 1], padding='SAME', data_format="NCHW")
     return conv
 
-def sn_non_local_block_sim(x, update_collection, name, init=tf.contrib.layers.xavier_initializer()):
-  with tf.variable_scope(name):
+def sn_non_local_block_sim(x, update_collection, name, init=tf.keras.initializers.glorot_normal):
+  with tf.compat.v1.variable_scope(name):
     _, num_channels, h, w = x.get_shape().as_list()
     location_num = h * w
     downsampled_num = location_num // 4
@@ -45,7 +45,7 @@ def sn_non_local_block_sim(x, update_collection, name, init=tf.contrib.layers.xa
 
     # phi path
     phi = sn_conv1x1(x, num_channels // 8, update_collection, init, 'sn_conv_phi')
-    phi = tf.layers.max_pooling2d(inputs=phi, pool_size=[2, 2], strides=2, data_format='channels_first')
+    phi = tf.compat.v1.layers.max_pooling2d(inputs=phi, pool_size=[2, 2], strides=2, data_format='channels_first')
     phi_t = tf.reshape(
         phi, [-1, num_channels // 8, downsampled_num])
 
@@ -56,13 +56,13 @@ def sn_non_local_block_sim(x, update_collection, name, init=tf.contrib.layers.xa
 
     # g path
     g = sn_conv1x1(x, num_channels // 2, update_collection, init, 'sn_conv_g')
-    g = tf.layers.max_pooling2d(inputs=g, pool_size=[2, 2], strides=2, data_format='channels_first')
+    g = tf.compat.v1.layers.max_pooling2d(inputs=g, pool_size=[2, 2], strides=2, data_format='channels_first')
     g_t = tf.reshape(
       g, [-1, num_channels // 2, downsampled_num])
 
     attn_g_t = tf.matmul(g_t, attn_t)
     attn_g = tf.reshape(attn_g_t, [-1, num_channels // 2, h, w])
-    sigma = tf.get_variable(
+    sigma = tf.compat.v1.get_variable(
         'sigma_ratio', [], initializer=tf.constant_initializer(0.0))
     attn_g = sn_conv1x1(attn_g, num_channels, update_collection, init, 'sn_conv_attn')
 

@@ -10,7 +10,7 @@ import abc
 import save_images
 
 
-flags = tf.app.flags
+flags = tf.compat.v1.flags
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string("checkpoint_dir", None, "Directory to load model state from to resume training.")
@@ -58,8 +58,8 @@ class GAN(abc.ABC):
         self.y = y
         self.name = name
         self.training_steps = training_steps
-        assert batch_size % 10 is 0, "Batch size must be a multiple of 10."
-        assert batch_size % FLAGS.num_gpus is 0, "Batch size must be a multiple of the number of gpus"
+        assert batch_size % 10 == 0, "Batch size must be a multiple of 10."
+        assert batch_size % FLAGS.num_gpus == 0, "Batch size must be a multiple of the number of gpus"
         self.batch_size = batch_size
         self.output_real_images = output_real_images
         self.categories = categories
@@ -95,25 +95,25 @@ class GAN(abc.ABC):
         xs = tf.split(x, FLAGS.num_gpus)
         yxs = tf.split(yx, FLAGS.num_gpus)
 
-        labels = tf.placeholder(tf.int32, [FLAGS.num_gpus, self.batch_size // FLAGS.num_gpus])
-        z = tf.placeholder(tf.float32, [FLAGS.num_gpus, self.batch_size // FLAGS.num_gpus, 100])
-        d_adam = tf.train.AdamOptimizer(4e-4, beta1=0.5, beta2=0.999)
-        g_adam = tf.train.AdamOptimizer(1e-4, beta1=0.5, beta2=0.999)
+        labels = tf.compat.v1.placeholder(tf.int32, [FLAGS.num_gpus, self.batch_size // FLAGS.num_gpus])
+        z = tf.compat.v1.placeholder(tf.float32, [FLAGS.num_gpus, self.batch_size // FLAGS.num_gpus, 100])
+        d_adam = tf.compat.v1.train.AdamOptimizer(4e-4, beta1=0.5, beta2=0.999)
+        g_adam = tf.compat.v1.train.AdamOptimizer(1e-4, beta1=0.5, beta2=0.999)
 
         d_grads = []
         g_grads = []
         for i in range(FLAGS.num_gpus):
             with tf.device('/gpu:{:d}'.format(i)):
-                with tf.variable_scope('D', reuse=tf.AUTO_REUSE):
+                with tf.compat.v1.variable_scope('D', reuse=tf.compat.v1.AUTO_REUSE):
                     Dx, Dx_logits = self.discriminator(xs[i], yxs[i])
-                with tf.variable_scope('G', reuse=tf.AUTO_REUSE):
+                with tf.compat.v1.variable_scope('G', reuse=tf.compat.v1.AUTO_REUSE):
                     G = self.generator(z[i], labels[i])
-                with tf.variable_scope('D', reuse=tf.AUTO_REUSE):
+                with tf.compat.v1.variable_scope('D', reuse=tf.compat.v1.AUTO_REUSE):
                     Dg, Dg_logits = self.discriminator(G, labels[i])
 
                 loss_d, loss_g = self.losses(Dx_logits, Dg_logits, Dx, Dg)
 
-                vars = tf.trainable_variables()
+                vars = tf.compat.v1.trainable_variables()
                 for v in vars:
                     print(v.name)
                 d_params = [v for v in vars if v.name.startswith('D/')]
@@ -125,8 +125,8 @@ class GAN(abc.ABC):
         d_opt = d_adam.apply_gradients(average_gradients(d_grads))
         g_opt = g_adam.apply_gradients(average_gradients(g_grads))
 
-        d_saver = tf.train.Saver(d_params)
-        g_saver = tf.train.Saver(g_params)
+        d_saver = tf.compat.v1.train.Saver(d_params)
+        g_saver = tf.compat.v1.train.Saver(g_params)
 
         start_time = time.time()
         if FLAGS.checkpoint_dir:
@@ -139,11 +139,11 @@ class GAN(abc.ABC):
             shutil.copy(os.path.abspath(__file__), sample_directory)
 
 
-        config = tf.ConfigProto()
+        config = tf.compat.v1.ConfigProto()
         config.gpu_options.allow_growth = True
-        with tf.Session(config=config) as session:
-            tf.local_variables_initializer().run()
-            tf.global_variables_initializer().run()
+        with tf.compat.v1.Session(config=config) as session:
+            tf.compat.v1.local_variables_initializer().run()
+            tf.compat.v1.global_variables_initializer().run()
 
             start_step = 1
             if FLAGS.checkpoint_dir:

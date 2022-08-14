@@ -30,10 +30,6 @@ import ops
 import numpy as np
 import tensorflow as tf
 
-slim = tf.contrib.slim
-tfgan = tf.contrib.gan
-
-
 def _validate_image_inputs(inputs, validate_power2=True):
   inputs.get_shape().assert_has_rank(4)
   inputs.get_shape()[1:3].assert_is_fully_defined()
@@ -105,7 +101,7 @@ def get_conv(inputs, in_channels, out_channels, scale, suffix, use_sn):
         inputs, output_dim=out_channels, k_h=3, k_w=3,
         d_h=1, d_w=1, name="down_%s" % suffix, use_sn=use_sn)
     output = tf.nn.pool(
-        output, [2, 2], "AVG", "SAME", strides=[2, 2], name="pool_%s" % suffix, data_format="NCHW")
+        output, [2, 2], "AVG", padding="SAME", strides=[2, 2], name="pool_%s" % suffix, data_format="NCHW")
     return output
   return None  # Should not happen!
 
@@ -132,7 +128,7 @@ def resnet_block(inputs, in_channels, out_channels, scale,
       in_channels, out_channels, scale, block_scope,
       discriminator_normalization))
   print ("INPUTS: ", inputs.get_shape())
-  with tf.variable_scope(block_scope, values=[inputs], reuse=reuse):
+  with tf.compat.v1.variable_scope(block_scope, values=[inputs], reuse=reuse):
     output = inputs
     use_sn = discriminator_normalization == consts.SPECTRAL_NORM
 
@@ -208,7 +204,7 @@ def resnet5_generator(noise,
   # We want the last block to have 64 channels:
   ch = 64
 
-  with tf.variable_scope("generator", reuse=reuse):
+  with tf.compat.v1.variable_scope("generator", reuse=reuse):
     # Map noise to the actual seed.
     output = ops.linear(noise, ch * 8 * seed_size * seed_size, scope="fc_noise")
 
@@ -285,7 +281,7 @@ def resnet5_discriminator(inputs,
   assert colors in [1, 3]
 
   ch = 64
-  with tf.variable_scope("discriminator", values=[inputs], reuse=reuse):
+  with tf.compat.v1.variable_scope("discriminator", values=[inputs], reuse=reuse):
     output = discriminator_block(
         inputs, in_channels=colors, out_channels=ch,
         scale="down", block_scope="B0", is_training=is_training, reuse=reuse,
@@ -321,7 +317,7 @@ def resnet_cifar_generator(noise,
                            reuse=None,
                            colors=3):
   batch_size = noise.get_shape().as_list()[0]
-  with tf.variable_scope("generator", reuse=reuse):
+  with tf.compat.v1.variable_scope("generator", reuse=reuse):
     # Map noise to the actual seed.
     output = ops.linear(
         noise, 4 * 4 * 256, scope="fc_noise")
@@ -358,7 +354,7 @@ def resnet_cifar_discriminator(inputs,
   colors = inputs.get_shape().as_list()[-1]
   assert colors in [1, 3]
 
-  with tf.variable_scope("discriminator", values=[inputs], reuse=reuse):
+  with tf.compat.v1.variable_scope("discriminator", values=[inputs], reuse=reuse):
     output = inputs
     channels = colors
 
@@ -388,7 +384,7 @@ def resnet_cifar_discriminator(inputs,
 # page 17.
 def resnet_stl_generator(noise, is_training, reuse=None, colors=3):
   batch_size = noise.get_shape().as_list()[0]
-  with tf.variable_scope("generator", reuse=reuse):
+  with tf.compat.v1.variable_scope("generator", reuse=reuse):
     # Map noise to the actual seed.
     output = ops.linear(noise, 6 * 6 * 512, scope="fc_noise")
 
@@ -438,7 +434,7 @@ def resnet_stl_discriminator(inputs,
   assert colors in [1, 3]
 
   ch = 64
-  with tf.variable_scope("discriminator", values=[inputs], reuse=reuse):
+  with tf.compat.v1.variable_scope("discriminator", values=[inputs], reuse=reuse):
     output = discriminator_block(
         inputs,
         in_channels=colors,
@@ -494,7 +490,7 @@ def resnet107_generator(noise, is_training, reuse=None, colors=3):
   batch_size = noise.get_shape().as_list()[0]
   ch = 64
 
-  with tf.variable_scope("generator", reuse=reuse):
+  with tf.compat.v1.variable_scope("generator", reuse=reuse):
     # Map noise to the actual seed.
     output = ops.linear(noise, 4 * 4 * 8 * ch, scope="fc_noise")
 
@@ -538,7 +534,7 @@ def resnet107_discriminator(inputs,
 
   ch = 64
 
-  with tf.variable_scope("discriminator", values=[inputs], reuse=reuse):
+  with tf.compat.v1.variable_scope("discriminator", values=[inputs], reuse=reuse):
     output = ops.conv2d(
         inputs, output_dim=ch // 4, k_h=3, k_w=3, d_h=1, d_w=1,
         name="color_conv")

@@ -76,7 +76,7 @@ def spectral_norm(input_):
 
   # Persisted approximation of first left singular vector of matrix `w`.
 
-  u_var = tf.get_variable(
+  u_var = tf.compat.v1.get_variable(
       input_.name.replace(":", "") + "/u_var",
       shape=(w.shape[0], 1),
       dtype=w.dtype,
@@ -97,7 +97,7 @@ def spectral_norm(input_):
     u = tf.nn.l2_normalize(tf.matmul(w, v), axis=None, epsilon=1e-12)
 
   # Update persisted approximation.
-  with tf.control_dependencies([tf.assign(u_var, u, name="update_u")]):
+  with tf.control_dependencies([tf.compat.v1.assign(u_var, u, name="update_u")]):
     u = tf.identity(u)
 
   # The authors of SN-GAN chose to stop gradient propagating through u and v.
@@ -126,12 +126,12 @@ def linear(input_,
 
   shape = input_.get_shape().as_list()
 
-  with tf.variable_scope(scope or "Linear"):
-    matrix = tf.get_variable(
+  with tf.compat.v1.variable_scope(scope or "Linear"):
+    matrix = tf.compat.v1.get_variable(
         "Matrix", [shape[1], output_size],
         tf.float32,
-        tf.contrib.layers.xavier_initializer())
-    bias = tf.get_variable(
+        tf.keras.initializers.glorot_normal)
+    bias = tf.compat.v1.get_variable(
         "bias", [output_size], initializer=tf.constant_initializer(bias_start))
     if use_sn:
       return tf.matmul(input_, spectral_norm(matrix)) + bias
@@ -151,7 +151,7 @@ def spectral_norm_update_ops(var_list, weight_getter):
       # matrix separately, and only normalize the weight matrix if needed.
       # But as spectral norm converges to 1.0 very quickly, it should be very
       # minor accuracy diff caused by float value division.
-      update_ops.append(tf.assign(var, spectral_norm(var)))
+      update_ops.append(tf.compat.v1.assign(var, spectral_norm(var)))
   return update_ops
 
 
@@ -175,9 +175,9 @@ def spectral_norm_value(var_list, weight_getter):
 
 
 def conv2d(input_, output_dim, k_h, k_w, d_h, d_w, name="conv2d",
-           initializer=tf.contrib.layers.xavier_initializer, use_sn=False):
-  with tf.variable_scope(name):
-    w = tf.get_variable(
+           initializer=tf.keras.initializers.glorot_normal, use_sn=False):
+  with tf.compat.v1.variable_scope(name):
+    w = tf.compat.v1.get_variable(
         "w", [k_h, k_w, input_.get_shape()[1], output_dim],
         initializer=initializer())
     if use_sn:
@@ -185,7 +185,7 @@ def conv2d(input_, output_dim, k_h, k_w, d_h, d_w, name="conv2d",
           input_, spectral_norm(w), strides=[1, 1, d_h, d_w], padding="SAME", data_format="NCHW")
     else:
       conv = tf.nn.conv2d(input_, w, strides=[1, 1, d_h, d_w], padding="SAME", data_format="NCHW")
-    biases = tf.get_variable(
+    biases = tf.compat.v1.get_variable(
         "biases", [output_dim], initializer=tf.constant_initializer(0.0))
     # return tf.reshape(tf.nn.bias_add(conv, biases, data_format="NCHW"), conv.get_shape())
     return tf.nn.bias_add(conv, biases, data_format="NCHW")
@@ -193,13 +193,13 @@ def conv2d(input_, output_dim, k_h, k_w, d_h, d_w, name="conv2d",
 
 def deconv2d(input_, output_shape, k_h, k_w, d_h, d_w,
              stddev=0.02, name="deconv2d"):
-  with tf.variable_scope(name):
-    w = tf.get_variable(
+  with tf.compat.v1.variable_scope(name):
+    w = tf.compat.v1.get_variable(
         "w", [k_h, k_w, output_shape[-1], input_.get_shape()[-1]],
         initializer=tf.random_normal_initializer(stddev=stddev))
     deconv = tf.nn.conv2d_transpose(
         input_, w, output_shape=output_shape, strides=[1, d_h, d_w, 1])
-    biases = tf.get_variable(
+    biases = tf.compat.v1.get_variable(
         "biases", [output_shape[-1]], initializer=tf.constant_initializer(0.0))
     return tf.reshape(tf.nn.bias_add(deconv, biases), deconv.get_shape())
 
@@ -207,29 +207,29 @@ def deconv2d(input_, output_shape, k_h, k_w, d_h, d_w,
 def weight_norm_linear(input_, output_size,
                        init=False, init_scale=1.0,
                        name="wn_linear",
-                       initializer=tf.truncated_normal_initializer,
+                       initializer=tf.keras.initializers.truncated_normal,
                        stddev=0.02):
   """Linear layer with Weight Normalization (Salimans, Kingma '16)."""
-  with tf.variable_scope(name):
+  with tf.compat.v1.variable_scope(name):
     if init:
-      v = tf.get_variable("V", [int(input_.get_shape()[1]), output_size],
+      v = tf.compat.v1.get_variable("V", [int(input_.get_shape()[1]), output_size],
                           tf.float32, initializer(0, stddev), trainable=True)
       v_norm = tf.nn.l2_normalize(v.initialized_value(), [0])
       x_init = tf.matmul(input_, v_norm)
       m_init, v_init = tf.nn.moments(x_init, [0])
       scale_init = init_scale / tf.sqrt(v_init + 1e-10)
-      g = tf.get_variable("g", dtype=tf.float32,
+      g = tf.compat.v1.get_variable("g", dtype=tf.float32,
                           initializer=scale_init, trainable=True)
-      b = tf.get_variable("b", dtype=tf.float32, initializer=
+      b = tf.compat.v1.get_variable("b", dtype=tf.float32, initializer=
                           -m_init*scale_init, trainable=True)
       x_init = tf.reshape(scale_init, [1, output_size]) * (
           x_init - tf.reshape(m_init, [1, output_size]))
       return x_init
     else:
 
-      v = tf.get_variable("V")
-      g = tf.get_variable("g")
-      b = tf.get_variable("b")
+      v = tf.compat.v1.get_variable("V")
+      g = tf.compat.v1.get_variable("g")
+      b = tf.compat.v1.get_variable("b")
       tf.assert_variables_initialized([v, g, b])
       x = tf.matmul(input_, v)
       scaler = g / tf.sqrt(tf.reduce_sum(tf.square(v), [0]))
@@ -243,11 +243,11 @@ def weight_norm_conv2d(input_, output_dim,
                        init, init_scale,
                        stddev=0.02,
                        name="wn_conv2d",
-                       initializer=tf.truncated_normal_initializer):
+                       initializer=tf.keras.initializers.truncated_normal):
   """Convolution with Weight Normalization (Salimans, Kingma '16)."""
-  with tf.variable_scope(name):
+  with tf.compat.v1.variable_scope(name):
     if init:
-      v = tf.get_variable(
+      v = tf.compat.v1.get_variable(
           "V", [k_h, k_w] + [int(input_.get_shape()[-1]), output_dim],
           tf.float32, initializer(0, stddev), trainable=True)
       v_norm = tf.nn.l2_normalize(v.initialized_value(), [0, 1, 2])
@@ -255,17 +255,17 @@ def weight_norm_conv2d(input_, output_dim,
                             padding="SAME")
       m_init, v_init = tf.nn.moments(x_init, [0, 1, 2])
       scale_init = init_scale / tf.sqrt(v_init + 1e-8)
-      g = tf.get_variable(
+      g = tf.compat.v1.get_variable(
           "g", dtype=tf.float32, initializer=scale_init, trainable=True)
-      b = tf.get_variable(
+      b = tf.compat.v1.get_variable(
           "b", dtype=tf.float32, initializer=-m_init*scale_init, trainable=True)
       x_init = tf.reshape(scale_init, [1, 1, 1, output_dim]) * (
           x_init - tf.reshape(m_init, [1, 1, 1, output_dim]))
       return x_init
     else:
-      v = tf.get_variable("V")
-      g = tf.get_variable("g")
-      b = tf.get_variable("b")
+      v = tf.compat.v1.get_variable("V")
+      g = tf.compat.v1.get_variable("g")
+      b = tf.compat.v1.get_variable("b")
       tf.assert_variables_initialized([v, g, b])
       w = tf.reshape(g, [1, 1, 1, output_dim]) * tf.nn.l2_normalize(
           v, [0, 1, 2])
@@ -279,13 +279,13 @@ def weight_norm_deconv2d(x, output_dim,
                          init=False, init_scale=1.0,
                          stddev=0.02,
                          name="wn_deconv2d",
-                         initializer=tf.truncated_normal_initializer):
+                         initializer=tf.keras.initializers.truncated_normal):
   """Transposed Convolution with Weight Normalization (Salimans, Kingma '16)."""
   xs = list(map(int, x.get_shape()))
   target_shape = [xs[0], xs[1] * d_h, xs[2] * d_w, output_dim]
-  with tf.variable_scope(name):
+  with tf.compat.v1.variable_scope(name):
     if init:
-      v = tf.get_variable(
+      v = tf.compat.v1.get_variable(
           "V", [k_h, k_w] + [output_dim, int(x.get_shape()[-1])],
           tf.float32, initializer(0, stddev), trainable=True)
       v_norm = tf.nn.l2_normalize(v.initialized_value(), [0, 1, 3])
@@ -293,17 +293,17 @@ def weight_norm_deconv2d(x, output_dim,
                                       [1, d_h, d_w, 1], padding="SAME")
       m_init, v_init = tf.nn.moments(x_init, [0, 1, 2])
       scale_init = init_scale/tf.sqrt(v_init + 1e-8)
-      g = tf.get_variable("g", dtype=tf.float32,
+      g = tf.compat.v1.get_variable("g", dtype=tf.float32,
                           initializer=scale_init, trainable=True)
-      b = tf.get_variable("b", dtype=tf.float32,
+      b = tf.compat.v1.get_variable("b", dtype=tf.float32,
                           initializer=-m_init*scale_init, trainable=True)
       x_init = tf.reshape(scale_init, [1, 1, 1, output_dim]) * (
           x_init - tf.reshape(m_init, [1, 1, 1, output_dim]))
       return x_init
     else:
-      v = tf.get_variable("v")
-      g = tf.get_variable("g")
-      b = tf.get_variable("b")
+      v = tf.compat.v1.get_variable("v")
+      g = tf.compat.v1.get_variable("g")
+      b = tf.compat.v1.get_variable("b")
       tf.assert_variables_initialized([v, g, b])
       w = tf.reshape(g, [1, 1, output_dim, 1]) * tf.nn.l2_normalize(
           v, [0, 1, 3])
@@ -320,7 +320,7 @@ class ConditionalBatchNorm(object):
 
   def __init__(self, num_categories, name='conditional_batch_norm', decay_rate=0.999, center=True,
                scale=True):
-    with tf.variable_scope(name):
+    with tf.compat.v1.variable_scope(name):
       self.name = name
       self.num_categories = num_categories
       self.center = center
@@ -335,17 +335,17 @@ class ConditionalBatchNorm(object):
     shape = tf.TensorShape([self.num_categories]).concatenate(params_shape)
     moving_shape = tf.TensorShape([1, 1, 1]).concatenate(params_shape)
 
-    with tf.variable_scope(self.name):
-      self.gamma = tf.get_variable(
+    with tf.compat.v1.variable_scope(self.name):
+      self.gamma = tf.compat.v1.get_variable(
           'gamma', shape,
           initializer=tf.ones_initializer())
-      self.beta = tf.get_variable(
+      self.beta = tf.compat.v1.get_variable(
           'beta', shape,
           initializer=tf.zeros_initializer())
-      self.moving_mean = tf.get_variable('mean', moving_shape,
+      self.moving_mean = tf.compat.v1.get_variable('mean', moving_shape,
                           initializer=tf.zeros_initializer(),
                           trainable=False)
-      self.moving_var = tf.get_variable('var', moving_shape,
+      self.moving_var = tf.compat.v1.get_variable('var', moving_shape,
                           initializer=tf.ones_initializer(),
                           trainable=False)
 
@@ -356,11 +356,11 @@ class ConditionalBatchNorm(object):
       decay = self.decay_rate
       variance_epsilon = 1E-5
       if is_training:
-        mean, variance = tf.nn.moments(inputs, axis, keep_dims=True)
-        update_mean = tf.assign(self.moving_mean, self.moving_mean * decay + mean * (1 - decay))
-        update_var = tf.assign(self.moving_var, self.moving_var * decay + variance * (1 - decay))
-        tf.add_to_collection(tf.GraphKeys.UPDATE_OPS, update_mean)
-        tf.add_to_collection(tf.GraphKeys.UPDATE_OPS, update_var)
+        mean, variance = tf.nn.moments(inputs, axis, keepdims=True)
+        update_mean = tf.compat.v1.assign(self.moving_mean, self.moving_mean * decay + mean * (1 - decay))
+        update_var = tf.compat.v1.assign(self.moving_var, self.moving_var * decay + variance * (1 - decay))
+        tf.compat.v1.add_to_collection(tf.compat.v1.GraphKeys.UPDATE_OPS, update_mean)
+        tf.compat.v1.add_to_collection(tf.compat.v1.GraphKeys.UPDATE_OPS, update_var)
         #with tf.control_dependencies([update_mean, update_var]):
         outputs = tf.nn.batch_normalization(
             inputs, mean, variance, beta, gamma, variance_epsilon)

@@ -6,7 +6,7 @@ import non_local
 
 
 def conv_generator(z):
-    with tf.variable_scope('generator'):
+    with tf.compat.v1.variable_scope('generator'):
         f1 = tf.layers.dense(z, 1024, tf.nn.leaky_relu)
         f1 = tf.layers.batch_normalization(f1, training=True)
 
@@ -25,7 +25,7 @@ def conv_generator(z):
         return conv3
 
 def conv_discriminator(x, reuse=False, use_sn=True, label_based_discriminator=False):
-    with tf.variable_scope('discriminator', reuse=reuse):
+    with tf.compat.v1.variable_scope('discriminator', reuse=reuse):
         h_conv1 = tf.nn.leaky_relu(ops.conv2d(x, 32, 5, 5, 2, 2, name="h_conv1", use_sn=use_sn))
 
         h_conv2 = tf.nn.leaky_relu(ops.conv2d(h_conv1, 64, 5, 5, 2, 2, name="h_conv2", use_sn=use_sn))
@@ -44,7 +44,7 @@ def conv_discriminator(x, reuse=False, use_sn=True, label_based_discriminator=Fa
 
 G_DIM = 64
 def simple_resnet_generator(z, labels):
-    with tf.variable_scope('generator'):
+    with tf.compat.v1.variable_scope('generator'):
         linear = tf.layers.dense(z, G_DIM * 4 * 4 * 4)
         linear = tf.reshape(linear, [-1, G_DIM * 4, 4, 4])
 
@@ -64,7 +64,7 @@ def simple_resnet_generator(z, labels):
 
 D_DIM = 64
 def simple_resnet_discriminator(x, labels, reuse=False, use_sn=True):
-    with tf.variable_scope('discriminator', reuse=reuse):
+    with tf.compat.v1.variable_scope('discriminator', reuse=reuse):
         res1 = resnet_blocks.simple_discriminator_block(x, D_DIM, "res1") # 16x16
         res2 = resnet_blocks.simple_discriminator_block(res1, D_DIM * 2, "res2") # 8x8
         res3 = resnet_blocks.simple_discriminator_block(res2, D_DIM * 4, "res3") # 4x4
@@ -77,11 +77,11 @@ def simple_resnet_discriminator(x, labels, reuse=False, use_sn=True):
 
 G_DIM = 64
 def resnet_generator(z, labels):
-    with tf.variable_scope('generator'):
-        embedding_map = tf.get_variable(
+    with tf.compat.v1.variable_scope('generator'):
+        embedding_map = tf.compat.v1.get_variable(
             name='embedding_map',
             shape=[10, 100],
-            initializer=tf.contrib.layers.xavier_initializer())
+            initializer=tf.keras.initializers.glorot_normal)
         label_embedding = tf.nn.embedding_lookup(embedding_map, labels)
         noise_plus_labels = tf.concat([z, label_embedding], 1)
         linear = ops.linear(noise_plus_labels, G_DIM * 4 * 4 * 4, use_sn=True)
@@ -94,7 +94,7 @@ def resnet_generator(z, labels):
         nl = non_local.sn_non_local_block_sim(res2, None, name='nl')
         res3 = resnet_blocks.class_conditional_generator_block(
             nl, labels, G_DIM, 10, True, "res3") # 32x32
-        res3 = tf.layers.batch_normalization(res3, training=True)
+        res3 = tf.compat.v1.layers.batch_normalization(res3, training=True)
         res3 = tf.nn.relu(res3)
 
         conv = ops.conv2d(res3, 3, 3, 3, 1, 1, name = "conv", use_sn=True)
@@ -106,7 +106,7 @@ def resnet_generator(z, labels):
 
 D_DIM = 64
 def resnet_discriminator(x, labels, reuse=False, use_sn=True):
-    with tf.variable_scope('discriminator', reuse=reuse):
+    with tf.compat.v1.variable_scope('discriminator', reuse=reuse):
         res1 = resnet_blocks.discriminator_residual_block(
             x, D_DIM, True, "res1", use_sn=use_sn, reuse=reuse) # 16x16
         nl = non_local.sn_non_local_block_sim(res1, None, name="nl")
@@ -121,10 +121,10 @@ def resnet_discriminator(x, labels, reuse=False, use_sn=True):
         res4_chanels = tf.reduce_sum(res4, [2, 3])
         f1_logit = ops.linear(res4_chanels, 1, scope="f1", use_sn=use_sn)
 
-        embedding_map = tf.get_variable(
+        embedding_map = tf.compat.v1.get_variable(
             name='embedding_map',
             shape=[10, D_DIM * 4],
-            initializer=tf.contrib.layers.xavier_initializer())
+            initializer=tf.keras.initializers.glorot_normal)
 
         label_embedding = tf.nn.embedding_lookup(embedding_map, labels)
         f1_logit += tf.reduce_sum(res4_chanels * label_embedding, axis=1, keepdims=True)
